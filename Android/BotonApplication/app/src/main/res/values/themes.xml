@@ -1,0 +1,19 @@
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!-- Base application theme. -->
+    <style name="Base.Theme.BotonApplication" parent="Theme.Material3.Light.NoActionBar">
+        <!-- Color principal -->
+        <item name="colorPrimary">@color/red_500</item>
+
+        <!-- Color para la barra de estado -->
+        <item name="android:statusBarColor">@color/dark_red</item>
+
+        <!-- Color de los íconos en la barra (opcional) -->
+        <item name="android:windowLightStatusBar">false</item>
+
+        <!-- Para que coincida con el estilo Material 3 -->
+        <item name="colorSurface">@color/white</item>
+        <item name="colorOnSurface">@color/black</item>
+    </style>
+
+    <style name="Theme.BotonApplication" parent="Base.Theme.BotonApplication" />
+</resources>

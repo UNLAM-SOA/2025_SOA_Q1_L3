@@ -9,4 +9,6 @@
     <color name="red_500">#F44336</color> <!-- Rojo Material Design estándar -->
     <color name="dark_red">#D32F2F</color> <!-- Rojo más oscuro para la barra -->
     <color name="gray">#757575</color>
+    <color name="green">#1F9D24</color>
+    <color name="yellow">#F2BB16</color>
 </resources>

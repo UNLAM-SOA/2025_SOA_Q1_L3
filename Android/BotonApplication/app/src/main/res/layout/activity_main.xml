@@ -23,5 +23,7 @@
         android:layout_height="wrap_content"
         android:text="Activar Monitoreo"/>
 
-    <!-- (Opcional: RecyclerView para historial) -->
+
+
+
 </LinearLayout>

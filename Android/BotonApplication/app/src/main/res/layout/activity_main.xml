@@ -23,7 +23,12 @@
         android:layout_height="wrap_content"
         android:text="Activar Monitoreo"/>
 
-
+    <Button
+        android:id="@+id/button"
+        android:onClick="actividadHistorial"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Historial" />
 
 
 </LinearLayout>

@@ -8,6 +8,7 @@ import android.content.IntentFilter;
 import android.os.Build;
 import android.os.Bundle;
 import android.util.Log;
+import android.view.View;
 import android.widget.Button;
 import android.widget.Switch;
 import android.widget.TextView;
@@ -50,6 +51,9 @@ public class MainActivity extends AppCompatActivity {
             manejarAccionBoton();
         });
 
+
+
+
         mqttReceiver = new BroadcastReceiver() {
             @Override
             public void onReceive(Context context, Intent intent) {
@@ -86,6 +90,15 @@ public class MainActivity extends AppCompatActivity {
                 }
             }
         };
+
+
+    }//fin onCreate
+
+
+    public void actividadHistorial(View view)
+    {
+        Intent intent = new Intent(this, HistorialActivity.class);
+        startActivity(intent);
     }
 
     private void manejarAccionBoton() {
@@ -131,8 +144,24 @@ public class MainActivity extends AppCompatActivity {
             case 2: status = "ALTO"; break;
             default: status = "DESCONOCIDO";
         }
+        // Actualiza texto en pantalla
         tvEstadoAlarma.setText("Estado: " + status);
         Log.d(TAG, "Estado actualizado: " + status);
+
+        // Guardar en SharedPreferences con timestamp
+        String timestamp = new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new java.util.Date());
+        String nuevoRegistro = timestamp + " - Estado: " + status;
+
+        // Obtener logs anteriores
+        android.content.SharedPreferences prefs = getSharedPreferences("Historial", MODE_PRIVATE);
+        String historial = prefs.getString("log_estado", "");
+
+        // Agregar nuevo
+        historial += nuevoRegistro + "\n";
+
+        // Guardar actualizado
+        prefs.edit().putString("log_estado", historial).apply();
+
     }
 
     @SuppressLint("UnspecifiedRegisterReceiverFlag")

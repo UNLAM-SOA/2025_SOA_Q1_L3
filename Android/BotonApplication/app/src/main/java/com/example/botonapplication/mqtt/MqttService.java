@@ -1,79 +1,105 @@
 package com.example.botonapplication.mqtt;
 
+import android.app.ActivityManager;
 import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
+import android.app.PendingIntent;
 import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
+import android.icu.text.SimpleDateFormat;
 import android.os.Build;
 import android.os.IBinder;
+import android.os.SystemClock;
 import android.util.Log;
 
 import androidx.core.app.NotificationCompat;
 
+import com.example.botonapplication.MainActivity;
 import com.example.botonapplication.R;
 
 import org.eclipse.paho.client.mqttv3.IMqttDeliveryToken;
 import org.eclipse.paho.client.mqttv3.MqttCallback;
 import org.eclipse.paho.client.mqttv3.MqttMessage;
+import org.json.JSONException;
+import org.json.JSONObject;
+
+import java.util.Date;
+import java.util.Locale;
 
 public class MqttService extends Service implements MqttCallback {
     private static final String TAG = "MQTT_Service";
     private MqttHandler mqttHandler;
     private static final String CHANNEL_ID = "mqtt_service_channel";
+    private static final int NOTIFICATION_ID = 1; // ID único para la notificación
+
+    private String lastAlarmStatus = "INACTIVO"; // Variable para estado dinámico
+    private String lastUpdateTime = ""; // Variable para estado dinámico
 
     @Override
     public void onCreate() {
         super.onCreate();
         Log.d(TAG, "Service creado");
         createNotificationChannel();
-        mqttHandler = new MqttHandler(this); // Pasamos 'this' como Context
+        mqttHandler = new MqttHandler(this);
     }
-
-    /*@Override
-    public int onStartCommand(Intent intent, int flags, int startId) {
-        // Notificación para Foreground Service
-        Notification notification = new NotificationCompat.Builder(this, CHANNEL_ID)
-                .setContentTitle("Monitoreo MQTT")
-                .setContentText("Escuchando alertas del circuito")
-                .setSmallIcon(R.drawable.ic_notification_mqtt) // Usa el ícono que creaste
-                .setPriority(NotificationCompat.PRIORITY_LOW)
-                .build();
-
-        startForeground(1, notification);
-        mqttHandler.connect();
-
-        return START_STICKY;
-    }*/
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-        // 1. Iniciar conexión MQTT (si no está conectado)
+        // 1. Crear notificación foreground primero (prioridad crítica)
+        Notification notification = buildNotification();
+        startForeground(NOTIFICATION_ID, notification);
+        Log.d(TAG, "Servicio en primer plano");
 
-        Log.d(TAG, "Estoy en onStartCommand");
-        if (!mqttHandler.isConnected()) {
-            mqttHandler.connect();
+        // 2. Manejar conexión MQTT
+        handleMqttConnection();
 
-        }
-
-        // 2. Procesar Intents de publicación (si los hay)
+        // 3. Procesar intent de publicación (si existe)
         if (intent != null && "PUBLISH_MQTT_MSG".equals(intent.getAction())) {
-            String topic = intent.getStringExtra("topic");
-            String message = intent.getStringExtra("message");
-            if (topic != null && message != null) {
-                mqttHandler.publish(topic, message);
-            }
+            handlePublishIntent(intent);
         }
-
-        // Notificación para Foreground Service
-        Notification notification = new NotificationCompat.Builder(this, CHANNEL_ID)
-                .setContentTitle("Monitoreo MQTT")
-                .setSmallIcon(R.drawable.ic_notification_mqtt)
-                .build();
-        startForeground(1, notification);
 
         return START_STICKY;
+    }
+    private Notification buildNotification() {
+        // Intent para abrir MainActivity
+        Intent openAppIntent = new Intent(this, MainActivity.class);
+        PendingIntent pendingIntent = PendingIntent.getActivity(
+                this,
+                0,
+                openAppIntent,
+                PendingIntent.FLAG_IMMUTABLE
+        );
+
+        return new NotificationCompat.Builder(this, CHANNEL_ID)
+                .setContentTitle("Estado Alarma: " + lastAlarmStatus)
+                .setContentText("Últ. actualización: " + lastUpdateTime)
+                .setSmallIcon(R.drawable.ic_notification_mqtt)
+                .setContentIntent(pendingIntent) // Abre MainActivity al tocar
+                .setPriority(NotificationCompat.PRIORITY_LOW)
+                .setOngoing(true)
+                .build();
+    }
+
+
+    private void handleMqttConnection() {
+        if (!mqttHandler.isConnected()) {
+            Log.d(TAG, "Intentando conectar MQTT...");
+            mqttHandler.connect();
+        } else {
+            Log.d(TAG, "MQTT ya conectado");
+        }
+    }
+
+    private void handlePublishIntent(Intent intent) {
+        String topic = intent.getStringExtra("topic");
+        String message = intent.getStringExtra("message");
+        if (topic != null && message != null) {
+            Log.d(TAG, "Publicando mensaje. Topic: " + topic);
+            mqttHandler.publish(topic, message);
+        }
     }
 
     private void createNotificationChannel() {
@@ -83,7 +109,9 @@ public class MqttService extends Service implements MqttCallback {
                     "Canal MQTT Service",
                     NotificationManager.IMPORTANCE_LOW
             );
+            channel.setDescription("Canal para el servicio MQTT en segundo plano");
             getSystemService(NotificationManager.class).createNotificationChannel(channel);
+            Log.d(TAG, "Canal de notificación creado");
         }
     }
 
@@ -92,32 +120,6 @@ public class MqttService extends Service implements MqttCallback {
         return null;
     }
 
-    // ----- Métodos de MqttCallback -----
-    @Override
-    public void connectionLost(Throwable cause) {
-        Log.w(TAG, "Conexión MQTT perdida: " + cause.getMessage());
-        // Reconexión automática podría ir aquí
-    }
-
-    @Override
-    public void messageArrived(String topic, MqttMessage message) {
-        String payload = new String(message.getPayload());
-
-
-        // Enviar broadcast a MainActivity (si está activa)
-        Intent intent = new Intent("MQTT_MSG_RECEIVED");
-        intent.addCategory(Intent.CATEGORY_DEFAULT);
-        intent.setPackage(getPackageName()); //ESTA LINEA HIZO QUE FUNCIONASE EL BROADCAST!!!
-        intent.putExtra("topic", topic);
-        intent.putExtra("message", payload);
-        sendBroadcast(intent);
-        Log.d(TAG, "Broadcast enviado. Acción: " + intent.getAction() + " | Categoría: " + intent.getCategories());
-    }
-
-    @Override
-    public void deliveryComplete(IMqttDeliveryToken token) {
-        Log.d(TAG, "Mensaje entregado al broker");
-    }
 
     @Override
     public void onDestroy() {
@@ -125,4 +127,75 @@ public class MqttService extends Service implements MqttCallback {
         mqttHandler.disconnect();
         Log.d(TAG, "Service destruido");
     }
+
+
+
+    // ----- Metodos de la interfaz MqttCallback -----
+    @Override
+    public void connectionLost(Throwable cause) {
+        Log.w(TAG, "Conexión perdida: " + cause.getMessage());
+
+        // Actualizar notificación (opcional)
+        Notification notification = buildNotification();
+        startForeground(NOTIFICATION_ID, notification);
+
+        // Iniciar reconexión automática
+        mqttHandler.scheduleReconnect();
+    }
+
+    @Override
+    public void messageArrived(String topic, MqttMessage message) {
+        String payload = new String(message.getPayload());
+        Log.d(TAG, "Mensaje recibido. Topic: " + topic + " | Payload: " + payload);
+
+        try {
+            JSONObject json = new JSONObject(payload);
+            double value = json.getDouble("value");
+
+            if (ConfigMQTT.TOPIC_NIVEL_ALARMA_UBIDOTS.equals(topic)) {
+                //Lógica Para niveles de alarma
+                lastAlarmStatus = (value == 0) ? "BAJO" : (value == 1) ? "MEDIO" : "ALTO";
+            }
+            else if (ConfigMQTT.TOPIC_ALARMA_UBIDOTS.equals(topic) && value == 0.0) {
+                //Manejar timeout
+                lastAlarmStatus = "INACTIVO (timeout)";
+            }
+
+            lastUpdateTime = new SimpleDateFormat("HH:mm", Locale.getDefault()).format(new Date());
+            updateNotification();
+
+        } catch (JSONException e) {
+            Log.e(TAG, "Error parseando JSON", e);
+        }
+
+        // Enviar broadcast a MainActivity
+        Intent intent = new Intent("MQTT_MSG_RECEIVED")
+                .addCategory(Intent.CATEGORY_DEFAULT)
+                .setPackage(getPackageName())
+                .putExtra("topic", topic)
+                .putExtra("message", payload)
+                .addFlags(Intent.FLAG_RECEIVER_FOREGROUND); // PRIORIDAD ALTA
+        sendBroadcast(intent);
+    }
+
+    private void updateNotification() {
+
+        // Guardar estado para que MainActivity lo recupere al reiniciarse
+        SharedPreferences prefs = getSharedPreferences("AppState", MODE_PRIVATE);
+        prefs.edit()
+                .putString("lastAlarmStatus", lastAlarmStatus)
+                .putString("lastUpdateTime", lastUpdateTime)
+                .apply();
+
+
+        NotificationManager nm = getSystemService(NotificationManager.class);
+        nm.notify(NOTIFICATION_ID, buildNotification());
+    }
+
+    @Override
+    public void deliveryComplete(IMqttDeliveryToken token) {
+        Log.d(TAG, "Mensaje entregado al broker");
+    }
+
+
 }

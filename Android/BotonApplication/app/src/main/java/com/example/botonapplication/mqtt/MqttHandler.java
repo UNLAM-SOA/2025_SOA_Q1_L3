@@ -1,5 +1,7 @@
 package com.example.botonapplication.mqtt;
 
+import android.os.Handler;
+import android.os.Looper;
 import android.util.Log;
 
 import org.eclipse.paho.client.mqttv3.IMqttDeliveryToken;
@@ -17,13 +19,19 @@ public class MqttHandler {
     private MqttClient client;
     private MqttCallback callback;
 
+    private static final long INITIAL_RECONNECT_DELAY = 1000; // 1 segundo
+    private static final long MAX_RECONNECT_DELAY = 60000;    // 60 segundos
+
+    private long reconnectDelay = INITIAL_RECONNECT_DELAY;
+
+
     // Constructor modificado: recibe el callback del Service
     public MqttHandler(MqttCallback callback) {
         this.callback = callback;
         Log.d(TAG, "MqttHandler inicializado");
     }
 
-    public void connect() {
+    public boolean connect() {
         Log.d(TAG, "Intentando conectar a MQTT...");
         try {
             MqttConnectOptions options = new MqttConnectOptions();
@@ -42,10 +50,12 @@ public class MqttHandler {
 
             Log.d(TAG, "Conexión exitosa");
             subscribe(ConfigMQTT.TOPIC_NIVEL_ALARMA_UBIDOTS);
-
+            subscribe(ConfigMQTT.TOPIC_ALARMA_UBIDOTS); //lo agrego para volver a off el switch
+            return true;
         } catch (MqttException e) {
             Log.e(TAG, "Error en conexión MQTT: " + e.getMessage());
         }
+            return false;
     }
 
     public void disconnect() {
@@ -93,5 +103,29 @@ public class MqttHandler {
     // Método auxiliar para verificar conexión
     public boolean isConnected() {
         return client != null && client.isConnected();
+    }
+    private final Handler reconnectHandler = new Handler(Looper.getMainLooper());
+    private final Runnable reconnectRunnable = new Runnable() {
+        @Override
+        public void run() {
+            if (!isConnected()) {
+                Log.w(TAG, "Intentando reconectar...");
+                boolean success = connect();
+                if (success) {
+                    reconnectDelay = INITIAL_RECONNECT_DELAY; // Resetear delay
+                } else {
+                    // Backoff exponencial: duplica el delay hasta el máximo
+                    reconnectDelay = Math.min(reconnectDelay * 2, MAX_RECONNECT_DELAY);
+                    Log.w(TAG, "Reconexión fallida. Próximo intento en " + reconnectDelay + "ms");
+                    reconnectHandler.postDelayed(this, reconnectDelay);
+                }
+            }
+        }
+    };
+
+    // Método para iniciar la reconexión automática
+    public void scheduleReconnect() {
+        reconnectHandler.removeCallbacks(reconnectRunnable); // Cancelar intentos previos
+        reconnectHandler.postDelayed(reconnectRunnable, reconnectDelay);
     }
 }

@@ -8,6 +8,8 @@ import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.util.Log;
 import android.widget.Button;
 import android.widget.TextView;
@@ -28,7 +30,10 @@ public class MainActivity extends AppCompatActivity {
     private TextView tvEstadoAlarma;
     private Button btnAccion;
     private BroadcastReceiver mqttReceiver;
+
+    private BroadcastReceiver shakeReceiver;
     private boolean isFirstMessage = true;
+
 
 
     @Override
@@ -97,6 +102,18 @@ public class MainActivity extends AppCompatActivity {
                 );
             }
         };
+
+        shakeReceiver = new BroadcastReceiver() {
+            @Override
+            public void onReceive(Context context, Intent intent) {
+                if ("SHAKE_DETECTED".equals(intent.getAction())) {
+                    Log.d(TAG, "Shake detectado - Simulando secuencia del botón");
+                    handleShakeEvent();
+
+                }
+            }
+        };
+
     }
 
     private void logIncomingMessage(Intent intent) {
@@ -131,6 +148,27 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    private void handleShakeEvent() {
+        String currentText = btnAccion.getText().toString();
+
+        runOnUiThread(() -> {
+            if (currentText.equals("ACTIVAR MONITOREO")) {
+                updateButtonState("MONITOREANDO...", false);
+
+
+                new Handler(Looper.getMainLooper()).postDelayed(() -> {
+                    updateButtonState("MODO CONSULTOR", true);
+                }, 2000); // 2 segundos de delay (ajustable)
+
+            } else if (currentText.equals("MODO CONSULTOR")) {
+
+                updateButtonState("REACTIVAR", true);
+            } else if (currentText.equals("REACTIVAR")) {
+
+                updateButtonState("ACTIVAR MONITOREO", true);
+            }
+        });
+    }
     private void handleTimeout() {
         runOnUiThread(() -> {
             updateButtonState("ACTIVAR MONITOREO", true);
@@ -190,6 +228,7 @@ public class MainActivity extends AppCompatActivity {
 
     private void updateAlarmStatus(int level) {
         String status = "El nivel de peligro es ";
+
         switch (level) {
             case 0: status = status + "BAJO"; break;
             case 1: status = status + "MEDIO"; break;
@@ -212,10 +251,14 @@ public class MainActivity extends AppCompatActivity {
         IntentFilter filter = new IntentFilter("MQTT_MSG_RECEIVED");
         filter.addCategory(Intent.CATEGORY_DEFAULT);
 
+        IntentFilter shakeFilter = new IntentFilter("SHAKE_DETECTED");
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             registerReceiver(mqttReceiver, filter, Context.RECEIVER_NOT_EXPORTED);
+            registerReceiver(shakeReceiver, shakeFilter, Context.RECEIVER_NOT_EXPORTED);
         } else {
             registerReceiver(mqttReceiver, filter);
+            registerReceiver(shakeReceiver, shakeFilter);
         }
         Log.d(TAG, "Receiver registrado para topics MQTT");
     }
@@ -223,6 +266,11 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onPause() {
         super.onPause();
-        unregisterReceiver(mqttReceiver);
+        try {
+            unregisterReceiver(mqttReceiver);
+            unregisterReceiver(shakeReceiver);
+        } catch (IllegalArgumentException e) {
+            Log.w(TAG, "Receiver ya estaba desregistrado", e);
+        }
     }
 }

@@ -9,6 +9,10 @@ import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.hardware.Sensor;
+import android.hardware.SensorEvent;
+import android.hardware.SensorEventListener;
+import android.hardware.SensorManager;
 import android.icu.text.SimpleDateFormat;
 import android.os.Build;
 import android.os.IBinder;
@@ -38,12 +42,20 @@ public class MqttService extends Service implements MqttCallback {
     private String lastAlarmStatus = "INACTIVO"; // Variable para estado dinámico
     private String lastUpdateTime = ""; // Variable para estado dinámico
 
+    private static final float UMBRAL_AGITACION = 25.0f;
+    private static final long DEBOUNCE_TIME_MS = 2000; // 2 segundos entre activaciones
+    private long lastShakeTime = 0;
+    private SensorManager sensorManager;
+    private Sensor accelerometer;
+    private SensorEventListener sensorListener;
+
     @Override
     public void onCreate() {
         super.onCreate();
         Log.d(TAG, "Service creado");
         createNotificationChannel();
         mqttHandler = new MqttHandler(this);
+        setupShakeSensor();
     }
 
     @Override
@@ -123,12 +135,89 @@ public class MqttService extends Service implements MqttCallback {
 
     @Override
     public void onDestroy() {
-        super.onDestroy();
+
         mqttHandler.disconnect();
+        if (sensorManager != null) {
+            sensorManager.unregisterListener(sensorListener);
+        }
         Log.d(TAG, "Service destruido");
+        super.onDestroy();
     }
 
+    private void updateNotification() {
 
+        String statusWithPrefix = "El nivel de peligro es " + lastAlarmStatus;
+
+        // Guardar estado para que MainActivity lo recupere al reiniciarse
+        SharedPreferences prefs = getSharedPreferences("AppState", MODE_PRIVATE);
+        prefs.edit()
+                .putString("lastAlarmStatus", statusWithPrefix)
+                .putString("lastUpdateTime", lastUpdateTime)
+                .apply();
+
+
+        NotificationManager nm = getSystemService(NotificationManager.class);
+        nm.notify(NOTIFICATION_ID, buildNotification());
+    }
+
+    private void setupShakeSensor() {
+        sensorManager = (SensorManager) getSystemService(SENSOR_SERVICE);
+        accelerometer = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
+
+        sensorListener = new SensorEventListener() {
+            @Override
+            public void onSensorChanged(SensorEvent event) {
+                float x = event.values[0];
+                float y = event.values[1];
+                float z = event.values[2];
+                float acceleration = (float) Math.sqrt(x * x + y * y + z * z);
+
+                if (acceleration > UMBRAL_AGITACION && System.currentTimeMillis() - lastShakeTime > DEBOUNCE_TIME_MS) {
+                    lastShakeTime = System.currentTimeMillis();
+                    triggerAlarmaPorAgitacion();
+                }
+            }
+
+            @Override
+            public void onAccuracyChanged(Sensor sensor, int accuracy) {
+                // No necesario, pero obligatorio implementar
+            }
+        };
+        sensorManager.registerListener(sensorListener, accelerometer, SensorManager.SENSOR_DELAY_UI);
+    }
+
+    private void triggerAlarmaPorAgitacion() {
+        try {
+            // publicar en MQTT (igual que el botón manual)
+            JSONObject json = new JSONObject();
+            json.put("value", 1.0);
+            mqttHandler.publish(ConfigMQTT.TOPIC_ALARMA_UBIDOTS, json.toString());
+
+            // para que la UX del boton se actualiza igual que manual
+            Intent intent = new Intent("SHAKE_DETECTED")
+                    .setPackage(getPackageName())
+                    .addFlags(Intent.FLAG_RECEIVER_FOREGROUND);
+            sendBroadcast(intent);
+
+
+            Log.d(TAG, "Alarma activada por agitación");
+            showShakeNotification();
+
+        } catch (JSONException e) {
+            Log.e(TAG, "Error al crear JSON para agitación", e);
+        }
+    }
+
+    private void showShakeNotification() {
+        NotificationCompat.Builder builder = new NotificationCompat.Builder(this, CHANNEL_ID)
+                .setContentTitle("¡Alarma activada!")
+                .setContentText("Se detectó agitación del dispositivo")
+                .setSmallIcon(R.drawable.ic_notification_mqtt)
+                .setPriority(NotificationCompat.PRIORITY_HIGH);
+
+        NotificationManager manager = getSystemService(NotificationManager.class);
+        manager.notify(NOTIFICATION_ID + 1, builder.build()); // ID diferente al foreground
+    }
 
     // ----- Metodos de la interfaz MqttCallback -----
     @Override
@@ -178,24 +267,14 @@ public class MqttService extends Service implements MqttCallback {
         sendBroadcast(intent);
     }
 
-    private void updateNotification() {
 
-        // Guardar estado para que MainActivity lo recupere al reiniciarse
-        SharedPreferences prefs = getSharedPreferences("AppState", MODE_PRIVATE);
-        prefs.edit()
-                .putString("lastAlarmStatus", lastAlarmStatus)
-                .putString("lastUpdateTime", lastUpdateTime)
-                .apply();
-
-
-        NotificationManager nm = getSystemService(NotificationManager.class);
-        nm.notify(NOTIFICATION_ID, buildNotification());
-    }
 
     @Override
     public void deliveryComplete(IMqttDeliveryToken token) {
         Log.d(TAG, "Mensaje entregado al broker");
     }
+
+
 
 
 }

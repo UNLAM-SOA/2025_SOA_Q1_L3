@@ -16,21 +16,28 @@ public class HistoryManager {
     private static final String PREFS_NAME = "AlarmHistoryPrefs";
     private static final String HISTORY_KEY = "alarm_history";
 
-    private final SharedPreferences sharedPreferences;
+    private static final int MAX_HISTORY_ENTRIES = 20; // Límite de eventos
 
 
     public HistoryManager(Context context) {
-        this.sharedPreferences = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+        //this.sharedPreferences = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
     }
-    public void addEntry(Context context, String status) {
+    public void addEntry(Context context, String status, double latitude, double longitude) {
         SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
         String historyJson = prefs.getString(HISTORY_KEY, "[]");
 
         try {
             JSONArray historyArray = new JSONArray(historyJson);
+
+            while (historyArray.length() >= MAX_HISTORY_ENTRIES) {
+                historyArray.remove(historyArray.length() - 1); // Elimina el más antiguo (último)
+            }
+
             JSONObject newEntry = new JSONObject();
             newEntry.put("status", status);
             newEntry.put("timestamp", getCurrentTimestamp());
+            newEntry.put("lat" , latitude);
+            newEntry.put("lon" , longitude);
 
             // Crea un NUEVO array combinando el nuevo + existente
             JSONArray newArray = new JSONArray();
@@ -42,7 +49,7 @@ public class HistoryManager {
             // Guarda el NUEVO array completo
             SharedPreferences.Editor editor = prefs.edit();
             editor.putString(HISTORY_KEY, newArray.toString());
-            editor.apply(); // ¡apply() es crucial!
+            editor.apply();
 
             Log.d("HistoryDebug", "JSON guardado: " + newArray.toString());
         } catch (JSONException e) {

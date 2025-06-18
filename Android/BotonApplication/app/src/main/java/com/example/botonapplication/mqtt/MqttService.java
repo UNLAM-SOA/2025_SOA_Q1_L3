@@ -9,6 +9,7 @@ import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.Service;
+import android.content.ActivityNotFoundException;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
@@ -19,8 +20,10 @@ import android.hardware.SensorManager;
 import android.icu.text.SimpleDateFormat;
 import android.location.Location;
 import android.location.LocationManager;
+import android.net.Uri;
 import android.os.Build;
 import android.os.IBinder;
+import android.os.Looper;
 import android.os.SystemClock;
 import android.util.Log;
 
@@ -29,6 +32,11 @@ import androidx.core.app.NotificationCompat;
 import com.example.botonapplication.MainActivity;
 import com.example.botonapplication.R;
 import com.example.botonapplication.utils.HistoryManager;
+import com.google.android.gms.location.FusedLocationProviderClient;
+import com.google.android.gms.location.LocationCallback;
+import com.google.android.gms.location.LocationRequest;
+import com.google.android.gms.location.LocationResult;
+import com.google.android.gms.location.LocationServices;
 
 import org.eclipse.paho.client.mqttv3.IMqttDeliveryToken;
 import org.eclipse.paho.client.mqttv3.MqttCallback;
@@ -48,7 +56,7 @@ public class MqttService extends Service implements MqttCallback {
     private String lastAlarmStatus = "INACTIVO"; // Variable para estado dinámico
     private String lastUpdateTime = ""; // Variable para estado dinámico
 
-    private static final float UMBRAL_AGITACION = 25.0f;
+    private static final float UMBRAL_AGITACION = 30.0f;
     private static final long DEBOUNCE_TIME_MS = 2000; // 2 segundos entre activaciones
     private long lastShakeTime = 0;
     private SensorManager sensorManager;
@@ -205,6 +213,7 @@ public class MqttService extends Service implements MqttCallback {
             json.put("value", 1.0);
             mqttHandler.publish(ConfigMQTT.TOPIC_ALARMA_UBIDOTS, json.toString());
 
+
             // para que la UX del boton se actualiza igual que manual
             Intent intent = new Intent("SHAKE_DETECTED")
                     .setPackage(getPackageName())
@@ -215,11 +224,11 @@ public class MqttService extends Service implements MqttCallback {
             Log.d(TAG, "Alarma activada por agitación");
             showShakeNotification();
 
+
         } catch (JSONException e) {
             Log.e(TAG, "Error al crear JSON para agitación", e);
         }
     }
-
     private void showShakeNotification() {
         NotificationCompat.Builder builder = new NotificationCompat.Builder(this, CHANNEL_ID)
                 .setContentTitle("¡Alarma activada!")
@@ -230,6 +239,27 @@ public class MqttService extends Service implements MqttCallback {
         NotificationManager manager = getSystemService(NotificationManager.class);
         manager.notify(NOTIFICATION_ID + 1, builder.build()); // ID diferente al foreground
     }
+
+
+    private Location getLastKnownLocation() {
+        if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PERMISSION_GRANTED) {
+            return null;
+        }
+
+        LocationManager locationManager = (LocationManager) getSystemService(LOCATION_SERVICE);
+        Location bestLocation = null;
+
+        // Obtiene ubicación de diferentes proveedores
+        for (String provider : locationManager.getAllProviders()) {
+            Location location = locationManager.getLastKnownLocation(provider);
+            if (location != null && (bestLocation == null ||
+                    location.getAccuracy() < bestLocation.getAccuracy())) {
+                bestLocation = location;
+            }
+        }
+        return bestLocation;
+    }
+
 
     // ----- Metodos de la interfaz MqttCallback -----
     @Override
@@ -262,7 +292,11 @@ public class MqttService extends Service implements MqttCallback {
                     return;
                 }
 
-                historyManager.addEntry(this, lastAlarmStatus);
+                Location location = getLastKnownLocation();
+                historyManager.addEntry(this, lastAlarmStatus,
+                        location != null ? location.getLatitude() : 0.0,
+                        location != null ? location.getLongitude() : 0.0
+                );
 
             }
             else if (ConfigMQTT.TOPIC_ALARMA_UBIDOTS.equals(topic) && value == 0.0) {

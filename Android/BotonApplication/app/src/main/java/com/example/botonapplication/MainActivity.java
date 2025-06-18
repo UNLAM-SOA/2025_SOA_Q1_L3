@@ -1,5 +1,8 @@
 package com.example.botonapplication;
 
+import static android.content.pm.PackageManager.PERMISSION_GRANTED;
+
+import android.Manifest;
 import android.annotation.SuppressLint;
 import android.content.BroadcastReceiver;
 import android.content.Context;
@@ -36,7 +39,7 @@ public class MainActivity extends AppCompatActivity {
     private BroadcastReceiver shakeReceiver;
     private boolean isFirstMessage = true;
 
-
+    private static final int LOCATION_PERMISSION_REQUEST = 1001; //para el permiso de GPS
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -48,9 +51,20 @@ public class MainActivity extends AppCompatActivity {
         getSharedPreferences("AlarmHistoryPrefs", MODE_PRIVATE).edit().clear().apply();
         setupMqttReceiver();
         loadLastState();
+        checkLocationPermissions();
 
     }
 
+    private void checkLocationPermissions() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PERMISSION_GRANTED) {
+                requestPermissions(
+                        new String[]{Manifest.permission.ACCESS_FINE_LOCATION},
+                        LOCATION_PERMISSION_REQUEST
+                );
+            }
+        }
+    }
     private void initLogging() {
         Log.d(TAG, "Actividad creada");
         Log.d(TAG, "Versión de la app: " + BuildConfig.VERSION_NAME);
@@ -230,7 +244,13 @@ public class MainActivity extends AppCompatActivity {
     private void updateButtonState(String text, boolean enabled) {
         btnAccion.setText(text);
         btnAccion.setEnabled(enabled);
-        Log.d(TAG, "Botón actualizado - Texto: " + text);
+
+
+        getSharedPreferences("AppState", MODE_PRIVATE)
+                .edit()
+                .putString("lastButtonText", text)
+                .apply();
+
     }
 
     private void updateAlarmStatus(int level) {

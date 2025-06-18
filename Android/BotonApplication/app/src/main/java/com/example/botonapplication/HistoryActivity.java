@@ -1,6 +1,8 @@
 package com.example.botonapplication;
 
 import android.content.SharedPreferences;
+import android.location.Address;
+import android.location.Geocoder;
 import android.os.Bundle;
 import android.util.Log;
 import android.widget.ArrayAdapter;
@@ -11,6 +13,10 @@ import androidx.appcompat.app.AppCompatActivity;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
+
+import java.io.IOException;
+import java.util.List;
+import java.util.Locale;
 
 public class HistoryActivity extends AppCompatActivity {
 
@@ -31,7 +37,14 @@ public class HistoryActivity extends AppCompatActivity {
             JSONArray historyArray = new JSONArray(historyJson);
             for (int i = 0; i < historyArray.length(); i++) {
                 JSONObject entry = historyArray.getJSONObject(i);
-                String item = entry.getString("timestamp") + " - " + entry.getString("status");
+                String item = String.format(Locale.US,
+                        "%s - %s\n%s\nLat: %.6f, Lon: %.6f",
+                        entry.getString("timestamp"),
+                        entry.getString("status"),
+                        getCityFromCoordinates(entry.getDouble("lat"), entry.getDouble("lon")),
+                        entry.getDouble("lat"),
+                        entry.getDouble("lon")
+                );
                 adapter.add(item);
             }
         } catch (JSONException e) {
@@ -40,5 +53,19 @@ public class HistoryActivity extends AppCompatActivity {
         }
 
         listView.setAdapter(adapter);
+    }
+
+    private String getCityFromCoordinates(double lat, double lon) {
+        Geocoder geocoder = new Geocoder(this, Locale.getDefault());
+        try {
+            List<Address> addresses = geocoder.getFromLocation(lat, lon, 1);
+            if (!addresses.isEmpty()) {
+                Address address = addresses.get(0);
+               return address.getLocality() + ", " + address.getSubAdminArea();
+            }
+        } catch (IOException e) {
+            Log.e("Geocoder", "Error obteniendo ciudad", e);
+        }
+        return "Ubicación desconocida";
     }
 }

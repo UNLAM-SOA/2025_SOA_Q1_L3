@@ -55,6 +55,7 @@ public class MqttService extends Service implements MqttCallback {
     private Sensor accelerometer;
     private SensorEventListener sensorListener;
 
+    private boolean isFirstMessage = true;
     private HistoryManager historyManager;
 
 
@@ -66,6 +67,7 @@ public class MqttService extends Service implements MqttCallback {
         mqttHandler = new MqttHandler(this);
         setupShakeSensor();
         historyManager = new HistoryManager(this);
+        isFirstMessage = true;
     }
 
     @Override
@@ -166,8 +168,8 @@ public class MqttService extends Service implements MqttCallback {
                 .apply();
 
 
-        NotificationManager nm = getSystemService(NotificationManager.class);
-        nm.notify(NOTIFICATION_ID, buildNotification());
+        NotificationManager notificationManager = getSystemService(NotificationManager.class);
+        notificationManager.notify(NOTIFICATION_ID, buildNotification());
     }
 
     private void setupShakeSensor() {
@@ -255,13 +257,20 @@ public class MqttService extends Service implements MqttCallback {
                 //Lógica Para niveles de alarma
                 lastAlarmStatus = (value == 0) ? "BAJO" : (value == 1) ? "MEDIO" : "ALTO";
 
-                historyManager.addEntry(this, lastAlarmStatus); // Ej: "BAJO", "MEDIO", "ALTO"
+                if (isFirstMessage) {
+                    isFirstMessage = false;
+                    return;
+                }
+
+                historyManager.addEntry(this, lastAlarmStatus);
+
             }
             else if (ConfigMQTT.TOPIC_ALARMA_UBIDOTS.equals(topic) && value == 0.0) {
                 //Manejar timeout
                 lastAlarmStatus = "INACTIVO (timeout)";
             }
 
+            updateNotification();
 
 
         } catch (JSONException e) {
@@ -278,14 +287,8 @@ public class MqttService extends Service implements MqttCallback {
         sendBroadcast(intent);
     }
 
-
-
     @Override
     public void deliveryComplete(IMqttDeliveryToken token) {
         Log.d(TAG, "Mensaje entregado al broker");
     }
-
-
-
-
 }

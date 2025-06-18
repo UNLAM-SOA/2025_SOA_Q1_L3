@@ -1,0 +1,55 @@
+package com.example.botonapplication.utils;
+
+import android.content.Context;
+import android.content.SharedPreferences;
+import android.icu.text.SimpleDateFormat;
+import android.util.Log;
+
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
+
+import java.util.Date;
+import java.util.Locale;
+
+public class HistoryManager {
+    private static final String PREFS_NAME = "AlarmHistoryPrefs";
+    private static final String HISTORY_KEY = "alarm_history";
+
+    private final SharedPreferences sharedPreferences;
+
+
+    public HistoryManager(Context context) {
+        this.sharedPreferences = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+    }
+    public void addEntry(Context context, String status) {
+        SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+        String historyJson = prefs.getString(HISTORY_KEY, "[]");
+
+        try {
+            JSONArray historyArray = new JSONArray(historyJson);
+            JSONObject newEntry = new JSONObject();
+            newEntry.put("status", status);
+            newEntry.put("timestamp", getCurrentTimestamp());
+
+            // Crea un NUEVO array combinando el nuevo + existente
+            JSONArray newArray = new JSONArray();
+            newArray.put(newEntry); // Primero el nuevo
+            for (int i = 0; i < historyArray.length(); i++) {
+                newArray.put(historyArray.getJSONObject(i)); // Luego los existentes
+            }
+
+            // Guarda el NUEVO array completo
+            SharedPreferences.Editor editor = prefs.edit();
+            editor.putString(HISTORY_KEY, newArray.toString());
+            editor.apply(); // ¡apply() es crucial!
+
+            Log.d("HistoryDebug", "JSON guardado: " + newArray.toString());
+        } catch (JSONException e) {
+            Log.e("HistoryManager", "Error al guardar entrada", e);
+        }
+    }
+    private String getCurrentTimestamp() {
+        return new SimpleDateFormat("HH:mm dd/MM/yyyy", Locale.getDefault()).format(new Date());
+    }
+}

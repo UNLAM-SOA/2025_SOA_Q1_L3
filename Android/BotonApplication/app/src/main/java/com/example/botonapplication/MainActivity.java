@@ -29,6 +29,8 @@ public class MainActivity extends AppCompatActivity {
     private static final String TAG = "DevelopTomi";
     private TextView tvEstadoAlarma;
     private Button btnAccion;
+
+    private Button btnHistory;
     private BroadcastReceiver mqttReceiver;
 
     private BroadcastReceiver shakeReceiver;
@@ -43,8 +45,10 @@ public class MainActivity extends AppCompatActivity {
         initLogging();
         initServices();
         initUIComponents();
+        getSharedPreferences("AlarmHistoryPrefs", MODE_PRIVATE).edit().clear().apply();
         setupMqttReceiver();
         loadLastState();
+
     }
 
     private void initLogging() {
@@ -66,9 +70,12 @@ public class MainActivity extends AppCompatActivity {
     private void initUIComponents() {
         tvEstadoAlarma = findViewById(R.id.tvEstadoAlarma);
         btnAccion = findViewById(R.id.btnActivar);
+        btnHistory = findViewById(R.id.btnHistory);
 
         btnAccion.setOnClickListener(v -> handleButtonAction());
         updateButtonState("ACTIVAR MONITOREO", true);
+
+        btnHistory.setOnClickListener(v -> startActivity(new Intent(this, HistoryActivity.class)));
 
         Log.d(TAG, "Componentes UI inicializados");
     }
@@ -136,11 +143,11 @@ public class MainActivity extends AppCompatActivity {
             double value = json.getDouble("value");
 
             if (ConfigMQTT.TOPIC_NIVEL_ALARMA_UBIDOTS.equals(topic)) {
-                Log.d(TAG, "Procesando nivel de alarma: " + value);
+
                 handleAlarmLevel((int) value);
             }
             else if (ConfigMQTT.TOPIC_ALARMA_UBIDOTS.equals(topic) && value == 0.0) {
-                Log.d(TAG, "Procesando timeout del sistema");
+
                 handleTimeout();
             }
         } catch (JSONException e) {
@@ -173,7 +180,7 @@ public class MainActivity extends AppCompatActivity {
         runOnUiThread(() -> {
             updateButtonState("ACTIVAR MONITOREO", true);
             tvEstadoAlarma.setText("Estado: INACTIVO");
-            Log.d(TAG, "UI actualizada por timeout");
+
         });
     }
 
@@ -186,7 +193,7 @@ public class MainActivity extends AppCompatActivity {
 
     private void handleButtonAction() {
         String currentText = btnAccion.getText().toString();
-        Log.d(TAG, "Acción de botón detectada - Estado actual: " + currentText);
+
 
         try {
             JSONObject json = new JSONObject();

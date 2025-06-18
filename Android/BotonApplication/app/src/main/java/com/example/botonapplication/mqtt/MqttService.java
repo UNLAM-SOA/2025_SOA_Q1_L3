@@ -1,5 +1,8 @@
 package com.example.botonapplication.mqtt;
 
+import static android.content.pm.PackageManager.PERMISSION_GRANTED;
+
+import android.Manifest;
 import android.app.ActivityManager;
 import android.app.Notification;
 import android.app.NotificationChannel;
@@ -14,6 +17,8 @@ import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
 import android.icu.text.SimpleDateFormat;
+import android.location.Location;
+import android.location.LocationManager;
 import android.os.Build;
 import android.os.IBinder;
 import android.os.SystemClock;
@@ -23,6 +28,7 @@ import androidx.core.app.NotificationCompat;
 
 import com.example.botonapplication.MainActivity;
 import com.example.botonapplication.R;
+import com.example.botonapplication.utils.HistoryManager;
 
 import org.eclipse.paho.client.mqttv3.IMqttDeliveryToken;
 import org.eclipse.paho.client.mqttv3.MqttCallback;
@@ -49,6 +55,9 @@ public class MqttService extends Service implements MqttCallback {
     private Sensor accelerometer;
     private SensorEventListener sensorListener;
 
+    private HistoryManager historyManager;
+
+
     @Override
     public void onCreate() {
         super.onCreate();
@@ -56,6 +65,7 @@ public class MqttService extends Service implements MqttCallback {
         createNotificationChannel();
         mqttHandler = new MqttHandler(this);
         setupShakeSensor();
+        historyManager = new HistoryManager(this);
     }
 
     @Override
@@ -244,14 +254,15 @@ public class MqttService extends Service implements MqttCallback {
             if (ConfigMQTT.TOPIC_NIVEL_ALARMA_UBIDOTS.equals(topic)) {
                 //Lógica Para niveles de alarma
                 lastAlarmStatus = (value == 0) ? "BAJO" : (value == 1) ? "MEDIO" : "ALTO";
+
+                historyManager.addEntry(this, lastAlarmStatus); // Ej: "BAJO", "MEDIO", "ALTO"
             }
             else if (ConfigMQTT.TOPIC_ALARMA_UBIDOTS.equals(topic) && value == 0.0) {
                 //Manejar timeout
                 lastAlarmStatus = "INACTIVO (timeout)";
             }
 
-            lastUpdateTime = new SimpleDateFormat("HH:mm", Locale.getDefault()).format(new Date());
-            updateNotification();
+
 
         } catch (JSONException e) {
             Log.e(TAG, "Error parseando JSON", e);

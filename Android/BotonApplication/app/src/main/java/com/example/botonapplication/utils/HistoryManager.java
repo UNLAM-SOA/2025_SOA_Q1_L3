@@ -22,7 +22,7 @@ public class HistoryManager {
     public HistoryManager(Context context) {
         //this.sharedPreferences = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
     }
-    public void addEntry(Context context, String status, double latitude, double longitude) {
+    public void addEntry(Context context, String status, double latitude, double longitude, boolean hasValidLocation) {
         SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
         String historyJson = prefs.getString(HISTORY_KEY, "[]");
 
@@ -38,6 +38,7 @@ public class HistoryManager {
             newEntry.put("timestamp", getCurrentTimestamp());
             newEntry.put("lat" , latitude);
             newEntry.put("lon" , longitude);
+            newEntry.put("location_available", hasValidLocation);
 
             // Crea un NUEVO array combinando el nuevo + existente
             JSONArray newArray = new JSONArray();

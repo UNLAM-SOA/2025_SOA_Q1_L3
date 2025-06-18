@@ -110,7 +110,7 @@ public class MqttService extends Service implements MqttCallback {
                 .setContentText("Últ. actualización: " + lastUpdateTime)
                 .setSmallIcon(R.drawable.ic_notification_mqtt)
                 .setContentIntent(pendingIntent) // Abre MainActivity al tocar
-                .setPriority(NotificationCompat.PRIORITY_LOW)
+                .setPriority(NotificationCompat.PRIORITY_HIGH)
                 .setOngoing(true)
                 .build();
     }
@@ -293,9 +293,11 @@ public class MqttService extends Service implements MqttCallback {
                 }
 
                 Location location = getLastKnownLocation();
+                boolean hasLocation = (location != null && location.getLatitude() != 0.0 && location.getLongitude() != 0.0);
                 historyManager.addEntry(this, lastAlarmStatus,
                         location != null ? location.getLatitude() : 0.0,
-                        location != null ? location.getLongitude() : 0.0
+                        location != null ? location.getLongitude() : 0.0,
+                        hasLocation
                 );
 
             }

@@ -41,7 +41,9 @@ public class HistoryActivity extends AppCompatActivity {
                         "%s - %s\n%s\nLat: %.6f, Lon: %.6f",
                         entry.getString("timestamp"),
                         entry.getString("status"),
-                        getCityFromCoordinates(entry.getDouble("lat"), entry.getDouble("lon")),
+                        entry.optBoolean("location_available", false) ?
+                                getCityFromCoordinates(entry.getDouble("lat"), entry.getDouble("lon")) :
+                                "Ubicación no disponible",
                         entry.getDouble("lat"),
                         entry.getDouble("lon")
                 );

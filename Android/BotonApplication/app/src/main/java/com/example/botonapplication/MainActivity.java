@@ -151,7 +151,7 @@ public class MainActivity extends AppCompatActivity {
         return false;
     }
 
-   private void processMqttMessage(String topic, String message) {
+    private void processMqttMessage(String topic, String message) {
         try {
             JSONObject json = new JSONObject(message);
             double value = json.getDouble("value");

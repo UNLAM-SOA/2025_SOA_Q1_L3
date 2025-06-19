@@ -48,7 +48,6 @@ public class MainActivity extends AppCompatActivity {
         initLogging();
         initServices();
         initUIComponents();
-        getSharedPreferences("AlarmHistoryPrefs", MODE_PRIVATE).edit().clear().apply();
         setupMqttReceiver();
         loadLastState();
         checkLocationPermissions();

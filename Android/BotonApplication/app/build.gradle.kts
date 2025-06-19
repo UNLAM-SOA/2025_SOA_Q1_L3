@@ -1,3 +1,5 @@
+import com.android.build.api.dsl.Packaging
+
 plugins {
     alias(libs.plugins.android.application)
 }
@@ -29,6 +31,18 @@ android {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
+    packaging {
+        resources {
+            excludes += setOf(
+                "META-INF/NOTICE.md",
+                "META-INF/LICENSE.md",
+                "META-INF/DEPENDENCIES",
+                "META-INF/INDEX.LIST",
+                "META-INF/versions/9/module-info.class",
+                "/META-INF/{AL2.0,LGPL2.1}"
+            )
+        }
+    }
 }
 
 dependencies {
@@ -41,6 +55,8 @@ dependencies {
     implementation(libs.org.eclipse.paho.android.service)
     implementation(libs.localbroadcastmanager)
     implementation(libs.play.services.location)
+    implementation(libs.android.mail)
+    implementation(libs.android.activation)
     testImplementation(libs.junit)
     androidTestImplementation(libs.ext.junit)
     androidTestImplementation(libs.espresso.core)

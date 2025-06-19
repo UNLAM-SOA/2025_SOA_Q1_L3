@@ -2,20 +2,30 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical">
+    android:orientation="vertical"
+    android:padding ="8dp">
 
+    <!-- Botón para enviar selección -->
     <ListView
         android:id="@+id/historyListView"
         android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1" /> <!-- Ocupa todo el espacio disponible -->
+        android:layout_height="587dp"
+        android:layout_marginBottom="16dp"
+        android:choiceMode="multipleChoice" />
 
+    <Button
+        android:id="@+id/btnSendSelected"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Enviar Selección"
+        android:layout_marginBottom="4dp" />
+
+
+    <!-- Botón para enviar todo -->
     <Button
         android:id="@+id/btnSendEmail"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Enviar Historial por Email"
-        android:layout_margin="16dp" />
-
+        android:text="Enviar Todo" />
 
 </LinearLayout>

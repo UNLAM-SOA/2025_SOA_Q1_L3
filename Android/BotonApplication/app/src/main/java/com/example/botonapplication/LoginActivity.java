@@ -15,6 +15,8 @@ public class LoginActivity extends AppCompatActivity {
     private static final String USER_CORRECTO = "admin";
     private static final String PASS_CORRECTO = "1234";
 
+    private static final String TAG = "APP_DEBUG";
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -32,7 +34,7 @@ public class LoginActivity extends AppCompatActivity {
                 Intent intent = new Intent(this, MainActivity.class);
                 startActivity(intent);
                 finish(); // Para que no se pueda volver con "Atrás"
-                Log.d("APP_DEBUG", "Redirigiendo a MainActivity");
+                Log.d(TAG, "Redirigiendo a MainActivity");
             } else {
                 Toast.makeText(this, "Usuario o contraseña incorrectos", Toast.LENGTH_SHORT).show();
             }

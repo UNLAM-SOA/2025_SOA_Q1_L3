@@ -196,31 +196,26 @@ void reconnect_mqtt()
   }
 }
 
-void callback_mqtt(char* topic, uint8_t* payload, unsigned int length)
-{
-  Serial.println("Mensaje recibido:");
+
+void callback_mqtt(char* topic, uint8_t* payload, unsigned int length) {
   Serial.print("Topic: ");
   Serial.println(topic);
 
-  String mensaje = "";
-  for (unsigned int i = 0; i < length; i++)
-  {
-    mensaje += (char)payload[i];
-  }
+  // Mostrar el payload como string
+  Serial.write(payload, length);
+  Serial.println();
 
   StaticJsonDocument<TAM_JSON> doc;
-  DeserializationError error = deserializeJson(doc, mensaje);
+  DeserializationError error = deserializeJson(doc, payload, length);
 
-  if (error) 
-  {
+  if (error) {
     Serial.print("Error al parsear JSON: ");
     Serial.println(error.c_str());
     return;
   }
 
   valor_mqtt = doc[UBIDOTS_VALUE];  
-
-  Serial.print("Valor recibido: ");
+  Serial.print("Valor recibido en el callback: ");
   Serial.println(valor_mqtt);
 }
 

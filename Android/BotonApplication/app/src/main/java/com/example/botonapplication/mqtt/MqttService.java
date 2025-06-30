@@ -144,6 +144,7 @@ public class MqttService extends Service implements MqttCallback {
 
     private void updateNotification() {
         SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
+
         prefs.edit()
                 .putString("lastAlarmStatus", "El nivel de peligro es " + lastAlarmStatus)
                 .putString("lastUpdateTime", lastUpdateTime)
@@ -330,7 +331,7 @@ public class MqttService extends Service implements MqttCallback {
                         hasLocation);
 
             } else if (ConfigMQTT.TOPIC_ALARMA_UBIDOTS.equals(topic) && value == 0.0) {
-                lastAlarmStatus = "INACTIVO (timeout)";
+                lastAlarmStatus = "INACTIVO";
             }
 
             updateNotification();

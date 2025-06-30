@@ -1,34 +1,55 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical"
+    android:background="@drawable/main_background"
     android:padding="16dp">
 
-    <!-- Estado de la alarma -->
-    <TextView
-        android:id="@+id/tvEstadoAlarma"
+    <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="Estado: Esperando datos..."
-        android:textSize="18sp"
-        android:padding="16dp"
-        android:background="@color/white"
-        android:textColor="@color/black"/>
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:gravity="center"
+        android:padding="16dp">
 
-    <!-- Botón para activar manualmente -->
-    <Button
-        android:id="@+id/btnActivar"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="Activar Monitoreo"/>
+        <!-- Estado de la alarma -->
+        <TextView
+            android:id="@+id/tvEstadoAlarma"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Estado: Esperando datos..."
+            android:textSize="18sp"
+            android:padding="16dp"
+            android:background="@color/white"
+            android:textColor="@color/black"
+            android:layout_marginBottom="16dp"/>
 
-    <Button
-        android:id="@+id/btnHistory"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="Ver historial"/>
+        <!-- Botón para activar manualmente -->
+        <Button
+            android:id="@+id/btnActivar"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Activar Monitoreo"
+            android:layout_marginBottom="12dp"/>
 
+        <!-- Botón para ver historial -->
+        <Button
+            android:id="@+id/btnHistory"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Ver historial"
+            android:layout_marginBottom="32dp"/>
 
+        <!-- Texto informativo -->
+        <TextView
+            android:id="@+id/tvInfo"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="SafeTap monitorea automáticamente eventos de emergencia.\nPodés activar la alarma de forma manual o mediante agitación.\n A continuación observarás el estado de peligro en el que se encuentra!\nGrupo L3 - v1.0"
+            android:textAlignment="center"
+            android:textColor="@color/white"
+            android:textSize="14sp"
+            android:layout_marginTop="16dp"/>
 
-</LinearLayout>
+    </LinearLayout>
+</ScrollView>

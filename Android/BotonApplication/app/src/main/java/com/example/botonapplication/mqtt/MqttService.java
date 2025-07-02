@@ -47,13 +47,13 @@ public class MqttService extends Service implements MqttCallback {
     private static final String TAG = "MQTT_Service";
     private MqttHandler mqttHandler;
     private static final String CHANNEL_ID = "mqtt_service_channel";
-    private static final int NOTIFICATION_ID = 1; // ID único para la notificación
+    private static final int NOTIFICATION_ID = 1;
 
-    private String lastAlarmStatus = "INACTIVO"; // Variable para estado dinámico
-    private String lastUpdateTime = ""; // Variable para estado dinámico
+    private String lastAlarmStatus = "INACTIVO";
+    private String lastUpdateTime = "";
 
     private static final float UMBRAL_AGITACION = 30.0f;
-    private static final long DEBOUNCE_TIME_MS = 2000; // 2 segundos entre activaciones
+    private static final long DEBOUNCE_TIME_MS = 2000;
     private long lastShakeTime = 0;
     private SensorManager sensorManager;
     private Sensor accelerometer;
@@ -81,15 +81,15 @@ public class MqttService extends Service implements MqttCallback {
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-        // 1. Crear notificación foreground primero (prioridad crítica)
+
         Notification notification = buildNotification();
         startForeground(NOTIFICATION_ID, notification);
         Log.d(TAG, "Servicio en primer plano");
 
-        // 2. Manejar conexión MQTT
+
         handleMqttConnection();
 
-        // 3. Procesar intent de publicación (si existe)
+
         if (intent != null && "PUBLISH_MQTT_MSG".equals(intent.getAction())) {
             handlePublishIntent(intent);
         }
@@ -97,7 +97,7 @@ public class MqttService extends Service implements MqttCallback {
         return START_STICKY;
     }
     private Notification buildNotification() {
-        // Intent para abrir MainActivity
+
         Intent openAppIntent = new Intent(this, MainActivity.class);
         PendingIntent pendingIntent = PendingIntent.getActivity(
                 this,
@@ -110,7 +110,7 @@ public class MqttService extends Service implements MqttCallback {
                 .setContentTitle("Estado Alarma: " + lastAlarmStatus)
                 .setContentText("Últ. actualización: " + lastUpdateTime)
                 .setSmallIcon(R.drawable.ic_notification_mqtt)
-                .setContentIntent(pendingIntent) // Abre MainActivity al tocar
+                .setContentIntent(pendingIntent)
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
                 .setOngoing(true)
                 .build();
@@ -130,8 +130,11 @@ public class MqttService extends Service implements MqttCallback {
         String topic = intent.getStringExtra("topic");
         String message = intent.getStringExtra("message");
         if (topic != null && message != null) {
-            Log.d(TAG, "Publicando mensaje. Topic: " + topic);
-            mqttHandler.publish(topic, message);
+            if (mqttHandler != null && mqttHandler.isConnected()) {
+                mqttHandler.publish(topic, message);
+            } else {
+                Log.w(TAG, "No se puede publicar. MQTT no está conectado.");
+            }
         }
     }
 
@@ -169,7 +172,7 @@ public class MqttService extends Service implements MqttCallback {
 
         String statusWithPrefix = "El nivel de peligro es " + lastAlarmStatus;
 
-        // Guardar estado para que MainActivity lo recupere al reiniciarse
+
         SharedPreferences prefs = getSharedPreferences("AppState", MODE_PRIVATE);
         prefs.edit()
                 .putString("lastAlarmStatus", statusWithPrefix)
@@ -207,22 +210,22 @@ public class MqttService extends Service implements MqttCallback {
 
             @Override
             public void onAccuracyChanged(Sensor sensor, int accuracy) {
-                // No necesario, pero obligatorio implementar
+
             }
         };
         sensorManager.registerListener(sensorListener, accelerometer, SensorManager.SENSOR_DELAY_UI);
     }
 
     private void triggerAlarmaPorAgitacion() {
-//        Log.d(TAG, "triggerAlarmaPorAgitacion() llamado. EstadoAnterior: " + estadoAnterior + ", lastAlarmStatus: " + lastAlarmStatus);
+
         try {
-            // publicar en MQTT (igual que el botón manual)
+
             JSONObject json = new JSONObject();
             json.put("value", 1.0);
             mqttHandler.publish(ConfigMQTT.TOPIC_ALARMA_UBIDOTS, json.toString());
 
 
-            // para que la UX del boton se actualiza igual que manual
+
             Intent intent = new Intent("SHAKE_DETECTED")
                     .setPackage(getPackageName())
                     .addFlags(Intent.FLAG_RECEIVER_FOREGROUND);
@@ -237,11 +240,11 @@ public class MqttService extends Service implements MqttCallback {
             if (lastAlarmStatus.contains("INACTIVO")) {
                 enviarMail = true;
             } else if (lastAlarmStatus.equals("CONSULTOR")) {
-                estabaEnConsultor = true; // registramos que estamos en consultor
+                estabaEnConsultor = true;
             } else if (estabaEnConsultor) {
-                // Si estábamos en CONSULTOR y ahora entramos a PELIGRO_X, enviamos
+
                 enviarMail = true;
-                estabaEnConsultor = false; // reset
+                estabaEnConsultor = false;
             }
 
             if (enviarMail && !lastAlarmStatus.equals(ultimoEstadoDelMail)) {
@@ -291,8 +294,9 @@ public class MqttService extends Service implements MqttCallback {
         );
 
         String asunto = "📩 ALERTA AUTOMÁTICA - " + timestamp;
+        String toEmail = "tomasbeta@outlook.com";
 
-        MailSender.sendEmail("tomasbeta@outlook.com", asunto, cuerpo, new MailSender.EmailCallback() {
+        MailSender.sendEmail(toEmail, asunto, cuerpo, new MailSender.EmailCallback() {
             @Override
             public void onSuccess() {
                 Log.i("MqttService", "Correo de emergencia enviado correctamente.");
@@ -370,11 +374,11 @@ public class MqttService extends Service implements MqttCallback {
     public void connectionLost(Throwable cause) {
         Log.w(TAG, "Conexión perdida: " + cause.getMessage());
 
-        // Actualizar notificación (opcional)
+
         Notification notification = buildNotification();
         startForeground(NOTIFICATION_ID, notification);
 
-        // Iniciar reconexión automática
+
         mqttHandler.scheduleReconnect();
     }
 
@@ -406,7 +410,7 @@ public class MqttService extends Service implements MqttCallback {
 
             }
             else if (ConfigMQTT.TOPIC_ALARMA_UBIDOTS.equals(topic) && value == 0.0) {
-                //Manejar timeout
+
 
                 lastAlarmStatus = "INACTIVO (timeout)";
             }
@@ -419,13 +423,13 @@ public class MqttService extends Service implements MqttCallback {
             Log.e(TAG, "Error parseando JSON", e);
         }
 
-        // Enviar broadcast a MainActivity
+
         Intent intent = new Intent("MQTT_MSG_RECEIVED")
                 .addCategory(Intent.CATEGORY_DEFAULT)
                 .setPackage(getPackageName())
                 .putExtra("topic", topic)
                 .putExtra("message", payload)
-                .addFlags(Intent.FLAG_RECEIVER_FOREGROUND); // PRIORIDAD ALTA
+                .addFlags(Intent.FLAG_RECEIVER_FOREGROUND);
         sendBroadcast(intent);
     }
 

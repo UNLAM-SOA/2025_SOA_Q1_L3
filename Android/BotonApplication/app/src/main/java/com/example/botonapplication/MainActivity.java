@@ -1,6 +1,6 @@
 package com.example.botonapplication;
 
-import static android.content.pm.PackageManager.PERMISSION_GRANTED;
+
 
 import android.Manifest;
 import android.annotation.SuppressLint;
@@ -32,7 +32,7 @@ import org.json.JSONObject;
 
 
 public class MainActivity extends AppCompatActivity {
-    private static final String TAG = "DevelopTomi";
+    private static final String TAG = "MainActivity";
     private TextView tvEstadoAlarma;
     private Button btnAccion;
 
@@ -41,6 +41,10 @@ public class MainActivity extends AppCompatActivity {
 
     private BroadcastReceiver shakeReceiver;
     private boolean isFirstMessage = true;
+
+    private static final String PREFS_NAME = "AppState";
+
+    private static final String PREFS_KEY_MAIN = "lastAlarmStatus";
 
     private static final int LOCATION_PERMISSION_REQUEST = 1001; //para el permiso de GPS
 
@@ -64,11 +68,11 @@ public class MainActivity extends AppCompatActivity {
                         LOCATION_PERMISSION_REQUEST
                 );
             } else {
-                // Permiso ya concedido, iniciar el servicio
+
                 initServices();
             }
         } else {
-            // Android < M, iniciar directamente
+
             initServices();
         }
     }
@@ -103,13 +107,13 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void loadLastState() {
-        SharedPreferences prefs = getSharedPreferences("AppState", MODE_PRIVATE);
-        String status = prefs.getString("lastAlarmStatus", "INACTIVO");
-        String time = prefs.getString("lastUpdateTime", "");
+        SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
+        String status = prefs.getString(PREFS_KEY_MAIN, "INACTIVO");
+
 
         runOnUiThread(() -> {
             tvEstadoAlarma.setText("Estado: " + status);
-            // Actualizar botón según estado
+
             if (status.contains("INACTIVO")) {
                 updateButtonState("ACTIVAR MONITOREO", true);
             } else if (status.contains("BAJO") || status.contains("MEDIO") || status.contains("ALTO")) {
@@ -179,6 +183,7 @@ public class MainActivity extends AppCompatActivity {
 
     private void handleShakeEvent() {
         String currentText = btnAccion.getText().toString();
+        int delayMillis = 2000;
 
         runOnUiThread(() -> {
             if (currentText.equals("ACTIVAR MONITOREO")) {
@@ -187,7 +192,7 @@ public class MainActivity extends AppCompatActivity {
 
                 new Handler(Looper.getMainLooper()).postDelayed(() -> {
                     updateButtonState("MODO CONSULTOR", true);
-                }, 2000); // 2 segundos de delay (ajustable)
+                }, delayMillis);
 
             } else if (currentText.equals("MODO CONSULTOR")) {
 
@@ -224,7 +229,7 @@ public class MainActivity extends AppCompatActivity {
 
             if (currentText.equals("ACTIVAR MONITOREO")) {
                 json.put("value", 1.0);
-                updateButtonState("MONITOREANDO...", false); // Feedback de espera
+                updateButtonState("MONITOREANDO...", false);
             }
             else if (currentText.equals("MODO CONSULTOR")) {
                 updateButtonState("REACTIVAR", true);
@@ -254,7 +259,7 @@ public class MainActivity extends AppCompatActivity {
         btnAccion.setEnabled(enabled);
 
 
-        getSharedPreferences("AppState", MODE_PRIVATE)
+        getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
                 .edit()
                 .putString("lastButtonText", text)
                 .apply();
@@ -315,7 +320,7 @@ public class MainActivity extends AppCompatActivity {
 
         if (requestCode == LOCATION_PERMISSION_REQUEST) {
             if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                // Si el usuario aceptó el permiso, ahora sí iniciamos el service
+
                 initServices();
             } else {
                 Toast.makeText(this, "Se requiere permiso de ubicación para funcionar correctamente", Toast.LENGTH_LONG).show();

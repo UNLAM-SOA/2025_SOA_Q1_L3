@@ -19,13 +19,13 @@ public class MqttHandler {
     private MqttClient client;
     private MqttCallback callback;
 
-    private static final long INITIAL_RECONNECT_DELAY = 1000; // 1 segundo
-    private static final long MAX_RECONNECT_DELAY = 60000;    // 60 segundos
+    private static final long INITIAL_RECONNECT_DELAY = 1000;
+    private static final long MAX_RECONNECT_DELAY = 60000;
 
     private long reconnectDelay = INITIAL_RECONNECT_DELAY;
 
 
-    // Constructor modificado: recibe el callback del Service
+
     public MqttHandler(MqttCallback callback) {
         this.callback = callback;
         Log.d(TAG, "MqttHandler inicializado");
@@ -45,12 +45,12 @@ public class MqttHandler {
                     new MemoryPersistence()
             );
 
-            client.setCallback(callback); // Usa el callback del Service
+            client.setCallback(callback);
             client.connect(options);
 
             Log.d(TAG, "Conexión exitosa");
             subscribe(ConfigMQTT.TOPIC_NIVEL_ALARMA_UBIDOTS);
-            subscribe(ConfigMQTT.TOPIC_ALARMA_UBIDOTS); //lo agrego para volver a off el switch
+            subscribe(ConfigMQTT.TOPIC_ALARMA_UBIDOTS);
             return true;
         } catch (MqttException e) {
             Log.e(TAG, "Error en conexión MQTT: " + e.getMessage());
@@ -100,7 +100,7 @@ public class MqttHandler {
         }
     }
 
-    // Método auxiliar para verificar conexión
+
     public boolean isConnected() {
         return client != null && client.isConnected();
     }
@@ -112,9 +112,9 @@ public class MqttHandler {
                 Log.w(TAG, "Intentando reconectar...");
                 boolean success = connect();
                 if (success) {
-                    reconnectDelay = INITIAL_RECONNECT_DELAY; // Resetear delay
+                    reconnectDelay = INITIAL_RECONNECT_DELAY;
                 } else {
-                    // Backoff exponencial: duplica el delay hasta el máximo
+
                     reconnectDelay = Math.min(reconnectDelay * 2, MAX_RECONNECT_DELAY);
                     Log.w(TAG, "Reconexión fallida. Próximo intento en " + reconnectDelay + "ms");
                     reconnectHandler.postDelayed(this, reconnectDelay);
@@ -123,9 +123,9 @@ public class MqttHandler {
         }
     };
 
-    // Método para iniciar la reconexión automática
+
     public void scheduleReconnect() {
-        reconnectHandler.removeCallbacks(reconnectRunnable); // Cancelar intentos previos
+        reconnectHandler.removeCallbacks(reconnectRunnable);
         reconnectHandler.postDelayed(reconnectRunnable, reconnectDelay);
     }
 }

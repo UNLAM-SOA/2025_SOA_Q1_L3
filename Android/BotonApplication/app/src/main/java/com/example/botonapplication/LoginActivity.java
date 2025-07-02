@@ -33,7 +33,7 @@ public class LoginActivity extends AppCompatActivity {
             if (user.equals(USER_CORRECTO) && pass.equals(PASS_CORRECTO)) {
                 Intent intent = new Intent(this, MainActivity.class);
                 startActivity(intent);
-                finish(); // Para que no se pueda volver con "Atrás"
+                finish();
                 Log.d(TAG, "Redirigiendo a MainActivity");
             } else {
                 Toast.makeText(this, "Usuario o contraseña incorrectos", Toast.LENGTH_SHORT).show();

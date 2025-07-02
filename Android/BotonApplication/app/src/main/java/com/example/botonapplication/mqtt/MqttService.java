@@ -30,6 +30,7 @@ import com.example.botonapplication.R;
 import com.example.botonapplication.utils.HistoryManager;
 import com.example.botonapplication.utils.MailSender;
 
+
 import org.eclipse.paho.client.mqttv3.IMqttDeliveryToken;
 import org.eclipse.paho.client.mqttv3.MqttCallback;
 import org.eclipse.paho.client.mqttv3.MqttMessage;
@@ -41,33 +42,31 @@ import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 
+
 public class MqttService extends Service implements MqttCallback {
     private static final String TAG = "MQTT_Service";
+    private MqttHandler mqttHandler;
     private static final String CHANNEL_ID = "mqtt_service_channel";
     private static final int NOTIFICATION_ID = 1;
-    private static final int SHAKE_NOTIFICATION_ID = 2;
-    private static final float SHAKE_THRESHOLD = 30.0f;
-    private static final long SHAKE_DEBOUNCE_MS = 2000;
-    private static final String ACTION_PUBLISH = "PUBLISH_MQTT_MSG";
-    private static final String PREFS_NAME = "AppState";
-    private static final String INTENT_SHAKE = "SHAKE_DETECTED";
-    private static final String INTENT_MQTT_RECEIVED = "MQTT_MSG_RECEIVED";
-    private static final String LOCATION_UNAVAILABLE = "Ubicacion no disponible";
-    private static final String UNKNOWN_LOCATION = "Ubicacion desconocida";
-
-    private MqttHandler mqttHandler;
-    private SensorManager sensorManager;
-    private Sensor accelerometer;
-    private SensorEventListener sensorListener;
-    private HistoryManager historyManager;
 
     private String lastAlarmStatus = "INACTIVO";
     private String lastUpdateTime = "";
-    private String lastMailStatus = "INACTIVO";
+
+    private static final float UMBRAL_AGITACION = 30.0f;
+    private static final long DEBOUNCE_TIME_MS = 2000;
+    private long lastShakeTime = 0;
+    private SensorManager sensorManager;
+    private Sensor accelerometer;
+    private SensorEventListener sensorListener;
 
     private boolean isFirstMessage = true;
-    private boolean wasInConsultor = false;
-    private long lastShakeTime = 0;
+    private HistoryManager historyManager;
+
+    private String ultimoEstadoDelMail = "INACTIVO";
+    private boolean estabaEnConsultor = false;
+
+
+
 
     @Override
     public void onCreate() {
@@ -75,48 +74,37 @@ public class MqttService extends Service implements MqttCallback {
         Log.d(TAG, "Service creado");
         createNotificationChannel();
         mqttHandler = new MqttHandler(this);
-        historyManager = new HistoryManager(this);
         setupShakeSensor();
+        historyManager = new HistoryManager(this);
+        isFirstMessage = true;
     }
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-        startForeground(NOTIFICATION_ID, buildNotification());
+
+        Notification notification = buildNotification();
+        startForeground(NOTIFICATION_ID, notification);
         Log.d(TAG, "Servicio en primer plano");
+
+
         handleMqttConnection();
-        if (intent != null && ACTION_PUBLISH.equals(intent.getAction())) {
+
+
+        if (intent != null && "PUBLISH_MQTT_MSG".equals(intent.getAction())) {
             handlePublishIntent(intent);
         }
+
         return START_STICKY;
     }
-
-    @Override
-    public void onDestroy() {
-        mqttHandler.disconnect();
-        if (sensorManager != null) {
-            sensorManager.unregisterListener(sensorListener);
-        }
-        Log.d(TAG, "Service destruido");
-        super.onDestroy();
-    }
-
-    @Override
-    public IBinder onBind(Intent intent) {
-        return null;
-    }
-
-    private void createNotificationChannel() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            NotificationChannel channel = new NotificationChannel(
-                    CHANNEL_ID, "Canal MQTT Service", NotificationManager.IMPORTANCE_LOW);
-            channel.setDescription("Canal para el servicio MQTT en segundo plano");
-            getSystemService(NotificationManager.class).createNotificationChannel(channel);
-        }
-    }
-
     private Notification buildNotification() {
+
+        Intent openAppIntent = new Intent(this, MainActivity.class);
         PendingIntent pendingIntent = PendingIntent.getActivity(
-                this, 0, new Intent(this, MainActivity.class), PendingIntent.FLAG_IMMUTABLE);
+                this,
+                0,
+                openAppIntent,
+                PendingIntent.FLAG_IMMUTABLE
+        );
 
         return new NotificationCompat.Builder(this, CHANNEL_ID)
                 .setContentTitle("Estado Alarma: " + lastAlarmStatus)
@@ -128,9 +116,13 @@ public class MqttService extends Service implements MqttCallback {
                 .build();
     }
 
+
     private void handleMqttConnection() {
         if (!mqttHandler.isConnected()) {
+            Log.d(TAG, "Intentando conectar MQTT...");
             mqttHandler.connect();
+        } else {
+            Log.d(TAG, "MQTT ya conectado");
         }
     }
 
@@ -138,138 +130,193 @@ public class MqttService extends Service implements MqttCallback {
         String topic = intent.getStringExtra("topic");
         String message = intent.getStringExtra("message");
         if (topic != null && message != null) {
-            mqttHandler.publish(topic, message);
+            if (mqttHandler != null && mqttHandler.isConnected()) {
+                mqttHandler.publish(topic, message);
+            } else {
+                Log.w(TAG, "No se puede publicar. MQTT no está conectado.");
+            }
         }
     }
 
-    private void updateNotification() {
-        SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
+    private void createNotificationChannel() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            NotificationChannel channel = new NotificationChannel(
+                    CHANNEL_ID,
+                    "Canal MQTT Service",
+                    NotificationManager.IMPORTANCE_LOW
+            );
+            channel.setDescription("Canal para el servicio MQTT en segundo plano");
+            getSystemService(NotificationManager.class).createNotificationChannel(channel);
+            Log.d(TAG, "Canal de notificación creado");
+        }
+    }
 
+    @Override
+    public IBinder onBind(Intent intent) {
+        return null;
+    }
+
+
+    @Override
+    public void onDestroy() {
+
+        mqttHandler.disconnect();
+        if (sensorManager != null) {
+            sensorManager.unregisterListener(sensorListener);
+        }
+        Log.d(TAG, "Service destruido");
+        super.onDestroy();
+    }
+
+    private void updateNotification() {
+
+        String statusWithPrefix = "El nivel de peligro es " + lastAlarmStatus;
+
+
+        SharedPreferences prefs = getSharedPreferences("AppState", MODE_PRIVATE);
         prefs.edit()
-                .putString("lastAlarmStatus", "El nivel de peligro es " + lastAlarmStatus)
+                .putString("lastAlarmStatus", statusWithPrefix)
                 .putString("lastUpdateTime", lastUpdateTime)
                 .apply();
 
-        NotificationManager manager = getSystemService(NotificationManager.class);
-        manager.notify(NOTIFICATION_ID, buildNotification());
+
+        NotificationManager notificationManager = getSystemService(NotificationManager.class);
+        notificationManager.notify(NOTIFICATION_ID, buildNotification());
     }
 
     private void setupShakeSensor() {
         sensorManager = (SensorManager) getSystemService(SENSOR_SERVICE);
         accelerometer = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
-
         if (accelerometer == null) {
             Log.e(TAG, "No se encontró sensor acelerómetro!");
-            return;
+        } else {
+            Log.d(TAG, "Sensor acelerómetro obtenido correctamente");
         }
 
         sensorListener = new SensorEventListener() {
             @Override
             public void onSensorChanged(SensorEvent event) {
-                float acceleration = (float) Math.sqrt(
-                        event.values[0] * event.values[0] +
-                                event.values[1] * event.values[1] +
-                                event.values[2] * event.values[2]);
+                float x = event.values[0];
+                float y = event.values[1];
+                float z = event.values[2];
+                float acceleration = (float) Math.sqrt(x * x + y * y + z * z);
 
-                if (acceleration > SHAKE_THRESHOLD &&
-                        System.currentTimeMillis() - lastShakeTime > SHAKE_DEBOUNCE_MS) {
+                if (acceleration > UMBRAL_AGITACION && System.currentTimeMillis() - lastShakeTime > DEBOUNCE_TIME_MS) {
                     lastShakeTime = System.currentTimeMillis();
+                    Log.d(TAG, "Shake detectado! Lanzando alarma.");
                     triggerAlarmaPorAgitacion();
                 }
             }
 
             @Override
-            public void onAccuracyChanged(Sensor sensor, int accuracy) {}
-        };
+            public void onAccuracyChanged(Sensor sensor, int accuracy) {
 
+            }
+        };
         sensorManager.registerListener(sensorListener, accelerometer, SensorManager.SENSOR_DELAY_UI);
     }
 
-    private Location getLastKnownLocation() {
-        if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PERMISSION_GRANTED) return null;
-
-        LocationManager locationManager = (LocationManager) getSystemService(LOCATION_SERVICE);
-        Location bestLocation = null;
-
-        for (String provider : locationManager.getAllProviders()) {
-            Location location = locationManager.getLastKnownLocation(provider);
-            if (location != null && (bestLocation == null ||
-                    location.getAccuracy() < bestLocation.getAccuracy())) {
-                bestLocation = location;
-            }
-        }
-        return bestLocation;
-    }
-
     private void triggerAlarmaPorAgitacion() {
+
         try {
+
             JSONObject json = new JSONObject();
             json.put("value", 1.0);
             mqttHandler.publish(ConfigMQTT.TOPIC_ALARMA_UBIDOTS, json.toString());
 
-            sendBroadcast(new Intent(INTENT_SHAKE)
-                    .setPackage(getPackageName())
-                    .addFlags(Intent.FLAG_RECEIVER_FOREGROUND));
 
+
+            Intent intent = new Intent("SHAKE_DETECTED")
+                    .setPackage(getPackageName())
+                    .addFlags(Intent.FLAG_RECEIVER_FOREGROUND);
+            sendBroadcast(intent);
+
+
+            Log.d(TAG, "Alarma activada por agitación");
             showShakeNotification();
 
-            boolean enviarMail = lastAlarmStatus.contains("INACTIVO") ||
-                    (lastAlarmStatus.equals("CONSULTOR") && (wasInConsultor = true)) ||
-                    (wasInConsultor && !(wasInConsultor = false));
+            boolean enviarMail = false;
 
-            if (enviarMail && !lastAlarmStatus.equals(lastMailStatus)) {
+            if (lastAlarmStatus.contains("INACTIVO")) {
+                enviarMail = true;
+            } else if (lastAlarmStatus.equals("CONSULTOR")) {
+                estabaEnConsultor = true;
+            } else if (estabaEnConsultor) {
+
+                enviarMail = true;
+                estabaEnConsultor = false;
+            }
+
+            if (enviarMail && !lastAlarmStatus.equals(ultimoEstadoDelMail)) {
+                HistoryManager historyManager = new HistoryManager(this);
                 JSONObject lastEntry = historyManager.getLastEntry(this);
                 if (lastEntry != null) {
-                    enviarMailDeEmergencia(
-                            lastEntry.getString("status"),
-                            lastEntry.getDouble("lat"),
-                            lastEntry.getDouble("lon"),
-                            lastEntry.optBoolean("location_available", false));
+                    String status = lastEntry.getString("status");
+                    double lat = lastEntry.getDouble("lat");
+                    double lon = lastEntry.getDouble("lon");
+                    boolean tieneUbicacion = lastEntry.optBoolean("location_available", false);
+
+                    enviarMailDeEmergencia(status, lat, lon, tieneUbicacion);
+                } else {
+                    Log.w(TAG, "No se encontró entrada de historial para enviar por correo.");
                 }
             }
         } catch (JSONException e) {
             Log.e(TAG, "Error al crear JSON para agitación", e);
         }
+
     }
 
     private void enviarMailDeEmergencia(String status, double lat, double lon, boolean tieneUbicacion) {
         String timestamp = new SimpleDateFormat("dd/MM/yyyy HH:mm:ss", Locale.getDefault()).format(new Date());
+
         if (tieneUbicacion) {
-            getCityFromCoordinatesAsync(lat, lon, location ->
-                    enviarMailConUbicacion(timestamp, status, lat, lon, location));
+            getCityFromCoordinatesAsync(lat, lon, ubicacionStr -> {
+                enviarMailConUbicacion(timestamp, status, lat, lon, ubicacionStr);
+            });
         } else {
-            enviarMailConUbicacion(timestamp, status, lat, lon, LOCATION_UNAVAILABLE);
+            enviarMailConUbicacion(timestamp, status, lat, lon, "Ubicación no disponible");
         }
     }
 
-    private void enviarMailConUbicacion(String timestamp, String status, double lat, double lon, String location) {
+    private void enviarMailConUbicacion(String timestamp, String status, double lat, double lon, String ubicacionStr) {
         String mapsLink = (lat == 0.0 && lon == 0.0) ?
-                "Sin coordenadas" : String.format(Locale.US, "https://maps.google.com/?q=%.6f,%.6f", lat, lon);
+                "Sin coordenadas" :
+                String.format(Locale.US, "https://maps.google.com/?q=%.6f,%.6f", lat, lon);
 
-        String cuerpo = String.format(Locale.US,
-                "\u23F0 [%s]\n\uD83D\uDEA8 Estado: %s\n\uD83D\uDCCD %s\n\uD83C\uDF10 %s",
-                timestamp, status, location, mapsLink);
+        String cuerpo = String.format(
+                Locale.US,
+                "⏰ [%s]\n🚨 Estado: %s\n📍 %s\n🌐 %s",
+                timestamp,
+                status,
+                ubicacionStr,
+                mapsLink
+        );
 
-        String asunto = "\uD83D\uDCE9 ALERTA AUTOMÁTICA - " + timestamp;
+        String asunto = "📩 ALERTA AUTOMÁTICA - " + timestamp;
+        String toEmail = "tomasbeta@outlook.com";
 
-        MailSender.sendEmail("tomasbeta@outlook.com", asunto, cuerpo, new MailSender.EmailCallback() {
+        MailSender.sendEmail(toEmail, asunto, cuerpo, new MailSender.EmailCallback() {
             @Override
             public void onSuccess() {
-                Log.i(TAG, "Correo de emergencia enviado correctamente.");
+                Log.i("MqttService", "Correo de emergencia enviado correctamente.");
             }
 
             @Override
             public void onError(String error) {
-                Log.e(TAG, "Error al enviar correo: " + error);
+                Log.e("MqttService", "Error al enviar correo: " + error);
             }
         });
     }
 
+
     private void getCityFromCoordinatesAsync(double lat, double lon, GeocodeCallback callback) {
         new Thread(() -> {
-            String result = UNKNOWN_LOCATION;
+            String result = "Ubicación desconocida";
             try {
-                List<Address> addresses = new Geocoder(this, Locale.getDefault()).getFromLocation(lat, lon, 1);
+                List<Address> addresses = new Geocoder(this, Locale.getDefault())
+                        .getFromLocation(lat, lon, 1);
+
                 if (!addresses.isEmpty()) {
                     Address address = addresses.get(0);
                     StringBuilder location = new StringBuilder();
@@ -281,12 +328,14 @@ public class MqttService extends Service implements MqttCallback {
                     result = location.toString();
                 }
             } catch (IOException e) {
-                Log.e(TAG, "Error obteniendo ciudad", e);
+                Log.e("Geocoder", "Error obteniendo ciudad", e);
             }
+
             final String finalResult = result;
             new android.os.Handler(getMainLooper()).post(() -> callback.onResult(finalResult));
         }).start();
     }
+
 
     private void showShakeNotification() {
         NotificationCompat.Builder builder = new NotificationCompat.Builder(this, CHANNEL_ID)
@@ -296,13 +345,40 @@ public class MqttService extends Service implements MqttCallback {
                 .setPriority(NotificationCompat.PRIORITY_HIGH);
 
         NotificationManager manager = getSystemService(NotificationManager.class);
-        manager.notify(SHAKE_NOTIFICATION_ID, builder.build());
+        manager.notify(NOTIFICATION_ID + 1, builder.build()); // ID diferente al foreground
     }
 
+
+    private Location getLastKnownLocation() {
+        if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PERMISSION_GRANTED) {
+            return null;
+        }
+
+        LocationManager locationManager = (LocationManager) getSystemService(LOCATION_SERVICE);
+        Location bestLocation = null;
+
+        // Obtiene ubicación de diferentes proveedores
+        for (String provider : locationManager.getAllProviders()) {
+            Location location = locationManager.getLastKnownLocation(provider);
+            if (location != null && (bestLocation == null ||
+                    location.getAccuracy() < bestLocation.getAccuracy())) {
+                bestLocation = location;
+            }
+        }
+        return bestLocation;
+    }
+
+
+    // ----- Metodos de la interfaz MqttCallback -----
     @Override
     public void connectionLost(Throwable cause) {
         Log.w(TAG, "Conexión perdida: " + cause.getMessage());
-        startForeground(NOTIFICATION_ID, buildNotification());
+
+
+        Notification notification = buildNotification();
+        startForeground(NOTIFICATION_ID, notification);
+
+
         mqttHandler.scheduleReconnect();
     }
 
@@ -316,6 +392,7 @@ public class MqttService extends Service implements MqttCallback {
             double value = json.getDouble("value");
 
             if (ConfigMQTT.TOPIC_NIVEL_ALARMA_UBIDOTS.equals(topic)) {
+
                 lastAlarmStatus = (value == 0) ? "BAJO" : (value == 1) ? "MEDIO" : "ALTO";
 
                 if (isFirstMessage) {
@@ -328,24 +405,32 @@ public class MqttService extends Service implements MqttCallback {
                 historyManager.addEntry(this, lastAlarmStatus,
                         location != null ? location.getLatitude() : 0.0,
                         location != null ? location.getLongitude() : 0.0,
-                        hasLocation);
+                        hasLocation
+                );
 
-            } else if (ConfigMQTT.TOPIC_ALARMA_UBIDOTS.equals(topic) && value == 0.0) {
-                lastAlarmStatus = "INACTIVO";
+            }
+            else if (ConfigMQTT.TOPIC_ALARMA_UBIDOTS.equals(topic) && value == 0.0) {
+
+
+                lastAlarmStatus = "INACTIVO (timeout)";
             }
 
+
             updateNotification();
+
 
         } catch (JSONException e) {
             Log.e(TAG, "Error parseando JSON", e);
         }
 
-        sendBroadcast(new Intent(INTENT_MQTT_RECEIVED)
+
+        Intent intent = new Intent("MQTT_MSG_RECEIVED")
                 .addCategory(Intent.CATEGORY_DEFAULT)
                 .setPackage(getPackageName())
                 .putExtra("topic", topic)
                 .putExtra("message", payload)
-                .addFlags(Intent.FLAG_RECEIVER_FOREGROUND));
+                .addFlags(Intent.FLAG_RECEIVER_FOREGROUND);
+        sendBroadcast(intent);
     }
 
     @Override

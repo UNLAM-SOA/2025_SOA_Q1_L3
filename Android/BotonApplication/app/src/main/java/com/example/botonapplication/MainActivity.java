@@ -1,6 +1,6 @@
 package com.example.botonapplication;
 
-import static android.content.pm.PackageManager.PERMISSION_GRANTED;
+
 
 import android.Manifest;
 import android.annotation.SuppressLint;
@@ -9,7 +9,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.SharedPreferences;
-
+import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
@@ -18,6 +18,7 @@ import android.util.Log;
 import android.widget.Button;
 import android.widget.TextView;
 import android.widget.Toast;
+
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
@@ -29,67 +30,49 @@ import org.eclipse.paho.android.service.BuildConfig;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+
 public class MainActivity extends AppCompatActivity {
-
-    private static final String TAG = "DevelopMain";
-
-    // Constantes para permisos y delays
-    private static final int LOCATION_PERMISSION_REQUEST_CODE = 1001;
-    private static final long BUTTON_STATE_DELAY_MS = 2000;
-
-    // Estados posibles del botón
-    private static final String BUTTON_TEXT_ACTIVAR = "ACTIVAR MONITOREO";
-    private static final String BUTTON_TEXT_MONITOREANDO = "MONITOREANDO...";
-    private static final String BUTTON_TEXT_MODO_CONSULTOR = "MODO CONSULTOR";
-    private static final String BUTTON_TEXT_REACTIVAR = "REACTIVAR";
-
-    // Estados del nivel de alarma
-    private static final String ALARM_STATUS_BAJO = "BAJO";
-    private static final String ALARM_STATUS_MEDIO = "MEDIO";
-    private static final String ALARM_STATUS_ALTO = "ALTO";
-    private static final String ALARM_STATUS_DESCONOCIDO = "DESCONOCIDO";
-
-    // SharedPreferences keys
-    private static final String PREFS_APP_STATE = "AppState";
-    private static final String PREF_KEY_LAST_BUTTON_TEXT = "lastButtonText";
-    private static final String PREF_KEY_LAST_ALARM_STATUS = "lastAlarmStatus";
-    private static final String PREF_KEY_LAST_UPDATE_TIME = "lastUpdateTime";
-
+    private static final String TAG = "MainActivity";
     private TextView tvEstadoAlarma;
     private Button btnAccion;
+
     private Button btnHistory;
-
     private BroadcastReceiver mqttReceiver;
-    private BroadcastReceiver shakeReceiver;
 
+    private BroadcastReceiver shakeReceiver;
     private boolean isFirstMessage = true;
+
+    private static final String PREFS_NAME = "AppState";
+
+    private static final String PREFS_KEY_MAIN = "lastAlarmStatus";
+
+    private static final int LOCATION_PERMISSION_REQUEST = 1001; //para el permiso de GPS
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-
         initLogging();
         initUIComponents();
         setupMqttReceiver();
         loadLastState();
         checkLocationPermissions();
+
     }
 
-    /**
-     * Verifica y solicita permiso de ubicación si es necesario.
-     */
     private void checkLocationPermissions() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PERMISSION_GRANTED) {
+            if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
                 requestPermissions(
                         new String[]{Manifest.permission.ACCESS_FINE_LOCATION},
-                        LOCATION_PERMISSION_REQUEST_CODE
+                        LOCATION_PERMISSION_REQUEST
                 );
             } else {
+
                 initServices();
             }
         } else {
+
             initServices();
         }
     }
@@ -99,9 +82,6 @@ public class MainActivity extends AppCompatActivity {
         Log.d(TAG, "Versión de la app: " + BuildConfig.VERSION_NAME);
     }
 
-    /**
-     * Inicia el servicio MQTT en primer plano o en background según versión Android.
-     */
     private void initServices() {
         Intent serviceIntent = new Intent(this, MqttService.class);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -113,43 +93,34 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    /**
-     * Inicializa componentes UI y asigna listeners.
-     */
     private void initUIComponents() {
         tvEstadoAlarma = findViewById(R.id.tvEstadoAlarma);
         btnAccion = findViewById(R.id.btnActivar);
         btnHistory = findViewById(R.id.btnHistory);
 
         btnAccion.setOnClickListener(v -> handleButtonAction());
-        updateButtonState(BUTTON_TEXT_ACTIVAR, true);
+        updateButtonState("ACTIVAR MONITOREO", true);
 
         btnHistory.setOnClickListener(v -> startActivity(new Intent(this, HistoryActivity.class)));
 
         Log.d(TAG, "Componentes UI inicializados");
     }
 
-    /**
-     * Carga el último estado guardado en SharedPreferences y actualiza UI.
-     */
     private void loadLastState() {
-        SharedPreferences prefs = getSharedPreferences(PREFS_APP_STATE, MODE_PRIVATE);
-        String status = prefs.getString(PREF_KEY_LAST_ALARM_STATUS, "INACTIVO");
-        String time = prefs.getString(PREF_KEY_LAST_UPDATE_TIME, "");
+        SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
+        String status = prefs.getString(PREFS_KEY_MAIN, "INACTIVO");
+
 
         runOnUiThread(() -> {
             tvEstadoAlarma.setText("Estado: " + status);
-            if (status.contains(ALARM_STATUS_BAJO) || status.contains(ALARM_STATUS_MEDIO) || status.contains(ALARM_STATUS_ALTO)) {
-                updateButtonState(BUTTON_TEXT_MODO_CONSULTOR, true);
-            } else {
-                updateButtonState(BUTTON_TEXT_ACTIVAR, true);
+
+            if (status.contains("INACTIVO")) {
+                updateButtonState("ACTIVAR MONITOREO", true);
+            } else if (status.contains("BAJO") || status.contains("MEDIO") || status.contains("ALTO")) {
+                updateButtonState("MODO CONSULTOR", true);
             }
         });
     }
-
-    /**
-     * Configura los BroadcastReceivers para MQTT y eventos de shake.
-     */
     private void setupMqttReceiver() {
         mqttReceiver = new BroadcastReceiver() {
             @Override
@@ -171,9 +142,11 @@ public class MainActivity extends AppCompatActivity {
                 if ("SHAKE_DETECTED".equals(intent.getAction())) {
                     Log.d(TAG, "Shake detectado - Simulando secuencia del botón");
                     handleShakeEvent();
+
                 }
             }
         };
+
     }
 
     private void logIncomingMessage(Intent intent) {
@@ -181,10 +154,6 @@ public class MainActivity extends AppCompatActivity {
         Log.d(TAG, "Topic: " + intent.getStringExtra("topic"));
     }
 
-    /**
-     * Ignora el primer mensaje MQTT recibido al conectar al broker.
-     * @return true si debe ignorarse, false si procesar.
-     */
     private boolean shouldIgnoreMessage(Intent intent) {
         if (isFirstMessage) {
             Log.d(TAG, "Ignorando mensaje inicial del broker");
@@ -194,17 +163,17 @@ public class MainActivity extends AppCompatActivity {
         return false;
     }
 
-    /**
-     * Procesa el mensaje MQTT recibido, actualizando UI según tópico y contenido.
-     */
     private void processMqttMessage(String topic, String message) {
         try {
             JSONObject json = new JSONObject(message);
             double value = json.getDouble("value");
 
             if (ConfigMQTT.TOPIC_NIVEL_ALARMA_UBIDOTS.equals(topic)) {
+
                 handleAlarmLevel((int) value);
-            } else if (ConfigMQTT.TOPIC_ALARMA_UBIDOTS.equals(topic) && value == 0.0) {
+            }
+            else if (ConfigMQTT.TOPIC_ALARMA_UBIDOTS.equals(topic) && value == 0.0) {
+
                 handleTimeout();
             }
         } catch (JSONException e) {
@@ -212,56 +181,60 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    /**
-     * Simula pulsación del botón al detectar un shake.
-     */
     private void handleShakeEvent() {
         String currentText = btnAccion.getText().toString();
+        int delayMillis = 2000;
 
         runOnUiThread(() -> {
-            if (BUTTON_TEXT_ACTIVAR.equals(currentText)) {
-                updateButtonState(BUTTON_TEXT_MONITOREANDO, false);
+            if (currentText.equals("ACTIVAR MONITOREO")) {
+                updateButtonState("MONITOREANDO...", false);
 
-                new Handler(Looper.getMainLooper()).postDelayed(() -> updateButtonState(BUTTON_TEXT_MODO_CONSULTOR, true), BUTTON_STATE_DELAY_MS);
 
-            } else if (BUTTON_TEXT_MODO_CONSULTOR.equals(currentText)) {
-                updateButtonState(BUTTON_TEXT_REACTIVAR, true);
-            } else if (BUTTON_TEXT_REACTIVAR.equals(currentText)) {
-                updateButtonState(BUTTON_TEXT_ACTIVAR, true);
+                new Handler(Looper.getMainLooper()).postDelayed(() -> {
+                    updateButtonState("MODO CONSULTOR", true);
+                }, delayMillis);
+
+            } else if (currentText.equals("MODO CONSULTOR")) {
+
+                updateButtonState("REACTIVAR", true);
+            } else if (currentText.equals("REACTIVAR")) {
+
+                updateButtonState("ACTIVAR MONITOREO", true);
             }
         });
     }
-
     private void handleTimeout() {
         runOnUiThread(() -> {
-            updateButtonState(BUTTON_TEXT_ACTIVAR, true);
+            updateButtonState("ACTIVAR MONITOREO", true);
             tvEstadoAlarma.setText("Estado: INACTIVO");
+
         });
     }
 
     private void handleAlarmLevel(int level) {
         runOnUiThread(() -> {
-            updateButtonState(BUTTON_TEXT_MODO_CONSULTOR, true);
+            updateButtonState("MODO CONSULTOR", true);
             updateAlarmStatus(level);
         });
     }
 
-    /**
-     * Lógica para el botón principal según estado actual.
-     */
     private void handleButtonAction() {
         String currentText = btnAccion.getText().toString();
+
 
         try {
             JSONObject json = new JSONObject();
             json.put("value", 1.0);
 
-            if (BUTTON_TEXT_ACTIVAR.equals(currentText)) {
-                updateButtonState(BUTTON_TEXT_MONITOREANDO, false);
-            } else if (BUTTON_TEXT_MODO_CONSULTOR.equals(currentText)) {
-                updateButtonState(BUTTON_TEXT_REACTIVAR, true);
-            } else if (BUTTON_TEXT_REACTIVAR.equals(currentText)) {
-                updateButtonState(BUTTON_TEXT_ACTIVAR, true);
+
+            if (currentText.equals("ACTIVAR MONITOREO")) {
+                json.put("value", 1.0);
+                updateButtonState("MONITOREANDO...", false);
+            }
+            else if (currentText.equals("MODO CONSULTOR")) {
+                updateButtonState("REACTIVAR", true);
+            } else if (currentText.equals("REACTIVAR")) {
+                updateButtonState("ACTIVAR MONITOREO", true);
             }
 
             sendMqttCommand(json.toString());
@@ -269,6 +242,7 @@ public class MainActivity extends AppCompatActivity {
             Log.e(TAG, "Error creando comando JSON: ", e);
         }
     }
+
 
     private void sendMqttCommand(String message) {
         Intent serviceIntent = new Intent(this, MqttService.class)
@@ -280,33 +254,28 @@ public class MainActivity extends AppCompatActivity {
         Log.d(TAG, "Comando MQTT enviado al topic ALARMA");
     }
 
-    /**
-     * Actualiza texto y estado habilitado del botón principal.
-     */
     private void updateButtonState(String text, boolean enabled) {
         btnAccion.setText(text);
         btnAccion.setEnabled(enabled);
 
-        getSharedPreferences(PREFS_APP_STATE, MODE_PRIVATE)
+
+        getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
                 .edit()
-                .putString(PREF_KEY_LAST_BUTTON_TEXT, text)
+                .putString("lastButtonText", text)
                 .apply();
+
     }
 
-    /**
-     * Actualiza el TextView con el estado del nivel de alarma.
-     */
     private void updateAlarmStatus(int level) {
-        String statusPrefix = "El nivel de peligro es ";
-        String status;
+        String status = "El nivel de peligro es ";
 
         switch (level) {
-            case 0: status = ALARM_STATUS_BAJO; break;
-            case 1: status = ALARM_STATUS_MEDIO; break;
-            case 2: status = ALARM_STATUS_ALTO; break;
-            default: status = ALARM_STATUS_DESCONOCIDO; break;
+            case 0: status = status + "BAJO"; break;
+            case 1: status = status + "MEDIO"; break;
+            case 2: status = status + "ALTO"; break;
+            default: status = "DESCONOCIDO";
         }
-        tvEstadoAlarma.setText("Estado: " + statusPrefix + status);
+        tvEstadoAlarma.setText("Estado: " + status);
         Log.d(TAG, "Estado actualizado: " + status);
     }
 
@@ -346,16 +315,17 @@ public class MainActivity extends AppCompatActivity {
     }
 
     @Override
-    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions,
-                                           @NonNull int[] grantResults) {
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
 
-        if (requestCode == LOCATION_PERMISSION_REQUEST_CODE) {
-            if (grantResults.length > 0 && grantResults[0] == PERMISSION_GRANTED) {
+        if (requestCode == LOCATION_PERMISSION_REQUEST) {
+            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+
                 initServices();
             } else {
                 Toast.makeText(this, "Se requiere permiso de ubicación para funcionar correctamente", Toast.LENGTH_LONG).show();
             }
         }
     }
+
 }

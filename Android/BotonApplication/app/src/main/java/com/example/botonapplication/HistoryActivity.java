@@ -49,7 +49,7 @@ public class HistoryActivity extends AppCompatActivity {
     private Button btnSendEmail;
     private Button btnSendSelected;
     private ArrayAdapter<String> adapter;
-    private JSONArray historyArray; // Mantener referencia al JSONArray original
+    private JSONArray historyArray;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -58,7 +58,7 @@ public class HistoryActivity extends AppCompatActivity {
 
         initializeViews();
         loadHistory();
-        //getSharedPreferences("AlarmHistoryPrefs", MODE_PRIVATE).edit().clear().apply();
+
         btnSendEmail.setOnClickListener(v -> sendAllHistoryByEmail());
         btnSendSelected.setOnClickListener(v -> sendSelectedLogs());
     }
@@ -68,7 +68,7 @@ public class HistoryActivity extends AppCompatActivity {
         btnSendEmail = findViewById(R.id.btnSendEmail);
         btnSendSelected = findViewById(R.id.btnSendSelected);
 
-        // Permitir selección múltiple en la lista
+
         listView.setChoiceMode(ListView.CHOICE_MODE_MULTIPLE);
 
         adapter = new ArrayAdapter<>(this, android.R.layout.simple_list_item_multiple_choice);
@@ -101,7 +101,7 @@ public class HistoryActivity extends AppCompatActivity {
 
                 adapter.add(initialEntryText);
 
-                // Actualizar ubicación asíncronamente si está disponible
+
                 if (hasLocation) {
                     final int index = i;
                     new Thread(() -> {
@@ -166,7 +166,7 @@ public class HistoryActivity extends AppCompatActivity {
                 sb.append(formatSingleEntry(entry)).append("\n\n");
             }
 
-            // Resumen al final
+
             sb.append("---\n");
             sb.append("Total de registros: ").append(historyArrayLocal.length()).append("\n");
             sb.append("Última actualización: ").append(

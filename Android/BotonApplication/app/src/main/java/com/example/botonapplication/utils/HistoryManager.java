@@ -79,7 +79,7 @@ public class HistoryManager {
         try {
             JSONArray historyArray = new JSONArray(historyJson);
             if (historyArray.length() > 0) {
-                return historyArray.getJSONObject(0); // Retorna la más reciente
+                return historyArray.getJSONObject(0);
             }
         } catch (JSONException e) {
             Log.e(TAG, "Error obteniendo última entrada", e);

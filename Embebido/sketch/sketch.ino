@@ -197,11 +197,12 @@ void reconnect_mqtt()
 }
 
 
-void callback_mqtt(char* topic, uint8_t* payload, unsigned int length) {
+void callback_mqtt(char* topic, uint8_t* payload, unsigned int length)
+{
   Serial.print("Topic: ");
   Serial.println(topic);
 
-  // Mostrar el payload como string
+  
   Serial.write(payload, length);
   Serial.println();
 

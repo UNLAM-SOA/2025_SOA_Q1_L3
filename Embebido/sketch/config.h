@@ -25,8 +25,8 @@
 #define FRECUENCIA_BUZZER_MEDIA  1000
 #define FRECUENCIA_BUZZER_ALTA   2000
 
-#define WIFI_SSID           "Telecentro-f309"
-#define WIFI_PASSWORD       "alberto123"
+#define WIFI_SSID           "tomaso"
+#define WIFI_PASSWORD       "tfup8648"
 #define MQTT_BROKER         "industrial.api.ubidots.com"
 #define MQTT_PORT           1883
 #define MQTT_USER           "BBUS-GvjZYx9q0dvsWlYvjV2JNRBjHPWQzo"

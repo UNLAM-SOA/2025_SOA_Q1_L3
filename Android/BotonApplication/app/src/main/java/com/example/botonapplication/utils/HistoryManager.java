@@ -16,14 +16,14 @@ public class HistoryManager {
 
     private static final String TAG = "HistoryManager";
 
-    // Constantes para SharedPreferences
+
     private static final String PREFS_NAME = "AlarmHistoryPrefs";
     private static final String HISTORY_KEY = "alarm_history";
 
-    // Límite máximo de entradas en el historial
+
     private static final int MAX_HISTORY_ENTRIES = 20;
 
-    // Formato de fecha para timestamps
+
     private static final String TIMESTAMP_FORMAT = "HH:mm dd/MM/yyyy";
 
     public HistoryManager(Context context) {
@@ -37,12 +37,12 @@ public class HistoryManager {
         try {
             JSONArray historyArray = new JSONArray(historyJson);
 
-            // Mantener el tamaño del historial limitado, eliminando entradas más antiguas
+
             while (historyArray.length() >= MAX_HISTORY_ENTRIES) {
-                historyArray.remove(historyArray.length() - 1); // Elimina la última (más antigua)
+                historyArray.remove(historyArray.length() - 1);
             }
 
-            // Crear nueva entrada con los datos recibidos y timestamp actual
+
             JSONObject newEntry = new JSONObject();
             newEntry.put("status", status);
             newEntry.put("timestamp", getCurrentTimestamp());
@@ -50,14 +50,14 @@ public class HistoryManager {
             newEntry.put("lon", longitude);
             newEntry.put("location_available", hasValidLocation);
 
-            // Crear nuevo JSONArray con la entrada nueva primero, seguido del historial previo
+
             JSONArray newArray = new JSONArray();
             newArray.put(newEntry);
             for (int i = 0; i < historyArray.length(); i++) {
                 newArray.put(historyArray.getJSONObject(i));
             }
 
-            // Guardar historial actualizado en SharedPreferences
+
             SharedPreferences.Editor editor = prefs.edit();
             editor.putString(HISTORY_KEY, newArray.toString());
             editor.apply();
@@ -72,11 +72,6 @@ public class HistoryManager {
         return new SimpleDateFormat(TIMESTAMP_FORMAT, Locale.getDefault()).format(new Date());
     }
 
-    /**
-     * Obtiene la última entrada (más reciente) del historial.
-     * @param context Context para acceder a SharedPreferences
-     * @return JSONObject con la última entrada o null si no existe o error.
-     */
     public JSONObject getLastEntry(Context context) {
         SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
         String historyJson = prefs.getString(HISTORY_KEY, "[]");

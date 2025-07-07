@@ -46,7 +46,7 @@ public class MainActivity extends AppCompatActivity {
 
     private static final String PREFS_KEY_MAIN = "lastAlarmStatus";
 
-    private static final int LOCATION_PERMISSION_REQUEST = 1001; //para el permiso de GPS
+    private static final int LOCATION_PERMISSION_REQUEST = 1001;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
